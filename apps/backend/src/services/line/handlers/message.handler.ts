@@ -1,23 +1,31 @@
 import { replyToLine } from '../client.ts';
 import { createEmployeeFlexMessage } from '../messages/employee-menu.ts';
 import type { LineEvent } from '../types.ts';
+import { env } from '../../../config/env.ts';
+import { getAllEmployees } from '../../../modules/employees/employee.service.ts';
 
-const EMPLOYEE_MENU_TRIGGER = '>พนักงาน';
+const TRIGGER_MENU = '>พนักงาน';
+const TRIGGER_LIST = '>รายชื่อ';
 
 export async function handleLineEvent(event: LineEvent): Promise<void> {
-  if (event.type !== 'message') {
-    return;
-  }
-
-  if (event.message?.type !== 'text' || !event.replyToken) {
-    return;
-  }
+  if (event.type !== 'message') return;
+  if (event.message?.type !== 'text' || !event.replyToken) return;
 
   const userText = event.message.text?.trim();
 
-  if (userText !== EMPLOYEE_MENU_TRIGGER) {
+  if (userText === TRIGGER_MENU) {
+    await replyToLine(event.replyToken, [createEmployeeFlexMessage(env.LIFF_ID)]);
     return;
   }
 
-  await replyToLine(event.replyToken, [createEmployeeFlexMessage()]);
+  if (userText === TRIGGER_LIST) {
+    const employees = await getAllEmployees();
+    const text =
+      employees.length === 0
+        ? 'ยังไม่มีพนักงานในระบบ'
+        : 'รายชื่อพนักงาน\n' +
+          employees.map((e, i) => `${i + 1}. ${e.first_name} ${e.last_name}`).join('\n');
+
+    await replyToLine(event.replyToken, [{ type: 'text', text }]);
+  }
 }

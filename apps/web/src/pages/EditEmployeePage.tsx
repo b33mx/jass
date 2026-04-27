@@ -1,19 +1,41 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { createEmployee } from '../api/employee.api';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { getEmployeeById, updateEmployee } from '../api/employee.api';
 
-type Toast = { type: 'success' | 'error'; message: string } | null;
 type FieldErrors = { firstName?: string; lastName?: string; wage?: string };
+type Toast = { type: 'success' | 'error'; message: string } | null;
 
-export function AddEmployeePage() {
+export function EditEmployeePage() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
   const [form, setForm] = useState({ firstName: '', lastName: '', wage: '' });
-  const [loading, setLoading] = useState(false);
+  const [originalName, setOriginalName] = useState('');
+  const [loadingData, setLoadingData] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [toast, setToast] = useState<Toast>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const wage = parseFloat(form.wage) || 0;
   const otRate = wage > 0 ? (wage / 8) * 1.5 : null;
+
+  useEffect(() => {
+    if (!id) return;
+    getEmployeeById(parseInt(id, 10))
+      .then((emp) => {
+        setForm({
+          firstName: emp.first_name,
+          lastName: emp.last_name,
+          wage: String(emp.wage),
+        });
+        setOriginalName(`${emp.first_name} ${emp.last_name}`);
+      })
+      .catch((err) => setFetchError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด'))
+      .finally(() => setLoadingData(false));
+  }, [id]);
 
   useEffect(() => {
     if (!toast) return;
@@ -38,51 +60,92 @@ export function AddEmployeePage() {
     return Object.keys(errs).length === 0;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleConfirmClick() {
     if (!validate()) {
       setToast({ type: 'error', message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
       return;
     }
-    setLoading(true);
+    setShowConfirm(true);
+  }
+
+  async function handleConfirmSubmit() {
+    if (!id) return;
+    setSubmitting(true);
     try {
-      await createEmployee({ firstName: form.firstName, lastName: form.lastName, wage });
-      setToast({ type: 'success', message: 'เพิ่มพนักงานสำเร็จ!' });
-      setTimeout(() => navigate('/employees/new/success'), 1200);
+      await updateEmployee(parseInt(id, 10), {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        wage: parseFloat(form.wage),
+      });
+      setShowConfirm(false);
+      setToast({ type: 'success', message: 'แก้ไขข้อมูลสำเร็จ!' });
+      setTimeout(() => navigate('/employees/edit'), 1200);
     } catch (err) {
-      console.log(err);
+      setShowConfirm(false);
       setToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
+        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่',
       });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
+  if (loadingData) {
+    return (
+      <div className="mx-auto max-w-md">
+        <div className="overflow-hidden rounded-3xl shadow-lg shadow-zinc-200/80">
+          <div className="h-32 animate-pulse bg-zinc-200" />
+          <div className="space-y-3 bg-white px-6 pb-6 pt-6">
+            <div className="h-10 animate-pulse rounded-xl bg-zinc-100" />
+            <div className="h-10 animate-pulse rounded-xl bg-zinc-100" />
+            <div className="h-10 animate-pulse rounded-xl bg-zinc-100" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="mx-auto max-w-md rounded-2xl bg-red-50 p-6 text-center text-sm text-red-600 ring-1 ring-red-200">
+        {fetchError}
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-md">
+    <>
+      <div className="mx-auto max-w-md">
         <div className="overflow-hidden rounded-3xl shadow-lg shadow-zinc-200/80">
 
-          {/* ── Red header ── */}
+          {/* Header */}
           <div className="relative bg-brandRed px-6 pb-10 pt-6">
             <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
             <div className="absolute -right-2 top-10 h-16 w-16 rounded-full bg-white/5" />
 
             <div className="relative flex items-center gap-4">
+              <button
+                onClick={() => navigate('/employees/edit')}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm transition hover:bg-white/30"
+              >
+                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
                 <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">เพิ่มพนักงาน</h1>
-                <p className="mt-0.5 text-sm text-white/60">กรอกข้อมูลพนักงานใหม่</p>
+                <h1 className="text-xl font-bold text-white">แก้ไขพนักงาน</h1>
+                <p className="mt-0.5 text-sm text-white/60">{originalName}</p>
               </div>
             </div>
           </div>
 
-          {/* ── White body ── */}
+          {/* Body */}
           <div className="-mt-5 rounded-t-3xl bg-white px-6 pb-6 pt-6">
 
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">ข้อมูลส่วนตัว</p>
@@ -112,9 +175,7 @@ export function AddEmployeePage() {
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">ค่าตอบแทน</p>
             <Field label="ค่าแรง" required hint="บาท / วัน" error={fieldErrors.wage}>
               <div className="relative">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-zinc-400">
-                  ฿
-                </span>
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-zinc-400">฿</span>
                 <input
                   name="wage"
                   type="number"
@@ -125,9 +186,7 @@ export function AddEmployeePage() {
                   placeholder="0"
                   className={`${inputCls(!!fieldErrors.wage)} pl-8`}
                 />
-                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
-                  / วัน
-                </span>
+                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400">/ วัน</span>
               </div>
             </Field>
 
@@ -156,7 +215,7 @@ export function AddEmployeePage() {
               </div>
             </div>
 
-            {/* Inline alert */}
+            {/* Toast */}
             {toast && (
               <div
                 className={`mt-5 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium ${
@@ -179,17 +238,73 @@ export function AddEmployeePage() {
             )}
 
             <button
-              type="submit"
-              onClick={handleSubmit}
-              disabled={loading}
-              className="mt-4 w-full rounded-2xl bg-brandRed py-4 text-sm font-bold tracking-wide text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              type="button"
+              onClick={handleConfirmClick}
+              className="mt-4 w-full rounded-2xl bg-brandRed py-4 text-sm font-bold tracking-wide text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 active:scale-[0.98]"
             >
-              {loading ? 'กำลังบันทึก...' : 'บันทึกพนักงาน'}
+              ยืนยันการแก้ไข
             </button>
 
           </div>
         </div>
       </div>
+
+      {/* Confirm Modal */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => !submitting && setShowConfirm(false)}
+          />
+          <div className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-xl">
+
+            <div className="bg-brandRed px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                  <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-base font-bold text-white">ยืนยันการแก้ไข</h2>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <p className="text-sm text-zinc-500">ต้องการแก้ไขข้อมูลพนักงานนี้ใช่ไหม?</p>
+
+              <div className="mt-4 rounded-2xl bg-zinc-50 px-4 py-3 ring-1 ring-zinc-100">
+                <p className="text-sm font-semibold text-zinc-800">
+                  {form.firstName} {form.lastName}
+                </p>
+                <p className="mt-0.5 text-xs text-zinc-400">
+                  ค่าแรงใหม่: {parseFloat(form.wage).toLocaleString('th-TH')} บาท / วัน
+                </p>
+              </div>
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(false)}
+                  disabled={submitting}
+                  className="flex-1 rounded-2xl border border-zinc-200 py-3 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSubmit}
+                  disabled={submitting}
+                  className="flex-1 rounded-2xl bg-brandRed py-3 text-sm font-bold text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {submitting ? 'กำลังบันทึก...' : 'ยืนยัน'}
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

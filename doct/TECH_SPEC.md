@@ -358,7 +358,45 @@ sequenceDiagram
     API-->>เสมียน: reply Flex: ยอดรวมแต่ละคน
 ```
 
-### 6.3 Intent Trigger Map
+### 6.3 Sequence: แก้ไขพนักงาน (Edit Employee Flow)
+
+```mermaid
+sequenceDiagram
+    actor เสมียน as เสมียน (LINE)
+    participant LINE as LINE Platform
+    participant API as Backend API
+    participant DB as Supabase DB
+    participant LIFF as LIFF Web App
+
+    เสมียน->>LINE: กดปุ่ม "แก้ไข" ใน Flex Menu
+    LINE->>LIFF: เปิด LIFF URL /employees/edit
+
+    Note over LIFF: หน้าเลือกพนักงาน
+    LIFF->>API: GET /api/employees
+    API->>DB: SELECT employees WHERE is_active = true
+    DB-->>LIFF: employees[]
+    LIFF-->>เสมียน: แสดงรายชื่อพนักงาน active ทั้งหมด (card list)
+    เสมียน->>LIFF: กดเลือกพนักงานที่ต้องการแก้ไข
+
+    Note over LIFF: หน้าฟอร์มแก้ไข
+    LIFF->>API: GET /api/employees/:id
+    API->>DB: SELECT employee WHERE id = :id
+    DB-->>LIFF: employee record
+    LIFF-->>เสมียน: แสดงฟอร์ม pre-filled (ดีไซน์เหมือน AddEmployee — header แดง, body ขาว)
+    เสมียน->>LIFF: แก้ไขข้อมูล แล้วกดปุ่ม "ยืนยันการแก้ไข"
+
+    Note over LIFF: Modal Confirm
+    LIFF-->>เสมียน: Modal: "ยืนยันการแก้ไขข้อมูลพนักงาน [ชื่อ] ใช่ไหม?"
+    เสมียน->>LIFF: กด "ยืนยัน"
+
+    LIFF->>API: PATCH /api/employees/:id
+    API->>DB: UPDATE employees SET ... WHERE id = :id
+    DB-->>API: updated record
+    API-->>LIFF: { success: true, data: employee }
+    LIFF-->>เสมียน: แสดง "แก้ไขสำเร็จ ✓" + ปิด LIFF
+```
+
+### 6.4 Intent Trigger Map
 
 | User พิมพ์ / กดปุ่ม | Intent | Action |
 |----------------------|--------|--------|
@@ -368,8 +406,11 @@ sequenceDiagram
 | `>คำนวณ` | CALCULATE_MENU | แสดง Flex: เลือกงวดที่จะคำนวณ |
 | `>รายงาน` | REPORT_MENU | แสดง Flex: เลือกประเภทรายงาน |
 | Postback: `employee_list` | LIST_EMPLOYEES | ดึง list + reply text |
-| Postback: `employee_create` | CREATE_EMPLOYEE | ส่ง LIFF URL (form สร้าง) |
+| Postback: `employee_create` | CREATE_EMPLOYEE | ส่ง LIFF URL `/employees/new` (form สร้าง) |
+| Postback: `employee_edit` | EDIT_EMPLOYEE | ส่ง LIFF URL `/employees/edit` (หน้าเลือกพนักงาน) |
 | Postback: `attendance_log:{id}` | LOG_ATTENDANCE | ส่ง LIFF URL (form บันทึกเวลา) |
+
+> **หมายเหตุ:** ปุ่ม "แก้ไข" ใน Flex Message ต้องเป็น `uri` action (ไม่ใช่ `message`) ชี้ไปที่ `${liffBase}/employees/edit` เพื่อเปิด LIFF โดยตรง
 
 ---
 

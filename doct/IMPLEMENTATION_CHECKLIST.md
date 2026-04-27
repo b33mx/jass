@@ -108,17 +108,78 @@
 - Handle postback `employee_delete:{id}` → confirm → deactivate → reply success
 - Acceptance: กดปุ่มทุกปุ่มใน Flex menu → ได้ response ถูกต้อง
 
-### [ ] Employee LIFF Pages
+### [ ] Employee LIFF Pages — สร้างพนักงาน
 
-**Files:** `apps/web/src/pages/employees/`
+**File:** `apps/web/src/pages/employees/AddEmployeePage.tsx`
 
-- `/employees/create` → Form: name, position, wage_type (select), rate fields
-  - Submit → `POST /api/employees`
-  - Success → แสดง "สร้างสำเร็จ" + ปุ่มปิด LIFF
-- `/employees/:id/edit` → เหมือน create แต่ดึงข้อมูลเดิมมา pre-fill
-  - Submit → `PATCH /api/employees/:id`
-- Validation: client-side ด้วย HTML5 required + number min=0
+- Route: `/employees/new`
+- Form: ชื่อ, นามสกุล, ค่าแรง
+  - OT rate คำนวณอัตโนมัติ: ค่าแรง ÷ 8 × 1.5 (แสดงแบบ read-only)
+- Submit → `POST /api/employees`
+- Success → navigate ไป `/employees/new/success`
+- Validation: client-side required + number min=0
 - Acceptance: กรอก form → submit → ข้อมูลขึ้นใน Supabase
+
+---
+
+### [ ] Employee Flex Button — เปลี่ยนปุ่ม "แก้ไข" เป็น URI Action
+
+**File:** `apps/backend/src/services/line/messages/employee-menu.ts`
+
+- เปลี่ยน action ของปุ่ม "แก้ไข" จาก `type: 'message'` เป็น `type: 'uri'`
+- URI ชี้ไปที่ `${liffBase}/employees/edit`
+- Acceptance: กดปุ่ม "แก้ไข" ใน LINE → เปิด LIFF `/employees/edit` ทันที (ไม่ส่งข้อความ)
+
+---
+
+### [ ] Employee LIFF Pages — หน้าเลือกพนักงานที่จะแก้ไข
+
+**File:** `apps/web/src/pages/employees/EditEmployeeSelectPage.tsx`
+
+- Route: `/employees/edit`
+- `GET /api/employees` → render card list รายชื่อพนักงาน active ทั้งหมด
+- Layout ของแต่ละ card:
+  ```
+  ┌─────────────────────────────┐
+  │  [icon]  ชื่อ นามสกุล       │
+  │          ค่าแรง X บาท/วัน  >│
+  └─────────────────────────────┘
+  ```
+- กด card → navigate ไป `/employees/:id/edit`
+- ถ้าไม่มีพนักงาน → แสดง empty state "ยังไม่มีพนักงานในระบบ"
+- Loading state ขณะ fetch
+- Acceptance: แสดงรายชื่อพนักงาน active ทุกคน, กดแล้วไปหน้าแก้ไขถูกต้อง
+
+---
+
+### [ ] Employee LIFF Pages — ฟอร์มแก้ไขพนักงาน + Modal Confirm
+
+**File:** `apps/web/src/pages/employees/EditEmployeePage.tsx`
+
+- Route: `/employees/:id/edit`
+- `GET /api/employees/:id` → ดึงข้อมูล employee มา pre-fill ฟอร์ม
+- **ดีไซน์เหมือน AddEmployeePage:** header แดง (brandRed), body ขาว, rounded-3xl, shadow
+  - Header แสดง: ชื่อพนักงาน + label "แก้ไขข้อมูล"
+  - Body: ฟอร์ม ชื่อ / นามสกุล / ค่าแรง (pre-filled จาก API)
+  - OT rate card (คำนวณ real-time เหมือน AddEmployeePage)
+- กดปุ่ม **"ยืนยันการแก้ไข"** → เปิด Modal Confirm (ไม่ submit ทันที)
+
+**Modal Confirm:**
+```
+┌──────────────────────────────────┐
+│  ยืนยันการแก้ไขข้อมูลพนักงาน    │
+│                                  │
+│  [ชื่อ นามสกุล]                  │
+│  ค่าแรงใหม่: X บาท/วัน           │
+│                                  │
+│  [ ยกเลิก ]    [ ยืนยัน ]        │
+└──────────────────────────────────┘
+```
+- กด **"ยืนยัน"** ใน modal → `PATCH /api/employees/:id` → ปิด modal → แสดง toast success → navigate ไป `/employees/edit`
+- กด **"ยกเลิก"** ใน modal → ปิด modal กลับไปหน้าฟอร์ม (ไม่แก้ข้อมูล)
+- Validation: ต้องมีชื่อ + นามสกุล + ค่าแรง > 0 ก่อนเปิด modal
+- Loading state ขณะ PATCH (ปิดปุ่มยืนยันไม่ให้กดซ้ำ)
+- Acceptance: แก้ไขข้อมูล → ยืนยันใน modal → ข้อมูลใน Supabase อัปเดตถูกต้อง
 
 ### [ ] Attendance Repository
 

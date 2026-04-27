@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "tunnel": "npx ngrok http 5173",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "tsc -p tsconfig.app.json --noEmit"

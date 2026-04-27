@@ -1,6 +1,8 @@
 import type { LineMessage } from '../types.ts';
 
-export function createEmployeeFlexMessage(): LineMessage {
+export function createEmployeeFlexMessage(liffId: string): LineMessage {
+  const liffBase = `https://liff.line.me/${liffId}`;
+
   return {
     type: 'flex',
     altText: 'เมนูจัดการพนักงาน',
@@ -29,7 +31,7 @@ export function createEmployeeFlexMessage(): LineMessage {
             action: {
               type: 'message',
               label: 'รายชื่อ',
-              text: 'รายชื่อ'
+              text: '>รายชื่อ'
             }
           },
           {
@@ -38,9 +40,9 @@ export function createEmployeeFlexMessage(): LineMessage {
             color: '#fada3d',
             height: 'sm',
             action: {
-              type: 'message',
+              type: 'uri',
               label: 'สร้าง',
-              text: 'สร้าง'
+              uri: `${liffBase}/employees/new`
             }
           },
           {
@@ -49,9 +51,9 @@ export function createEmployeeFlexMessage(): LineMessage {
             color: '#fada3d',
             height: 'sm',
             action: {
-              type: 'message',
+              type: 'uri',
               label: 'แก้ไข',
-              text: 'แก้ไข'
+              uri: `${liffBase}/employees/edit`
             }
           },
           {

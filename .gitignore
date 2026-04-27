@@ -24,6 +24,7 @@ pnpm-debug.log*
 tmp/
 temp/
 *.tmp
+supabase/.temp/
 
 # OS / editor
 .DS_Store

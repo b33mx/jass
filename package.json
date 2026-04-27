@@ -7,16 +7,19 @@
     "apps/web"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace apps/backend & npm run dev --workspace apps/web",
+    "dev:all": "concurrently -n backend,web,ngrok,liff -c blue,green,yellow,magenta \"npm run dev:backend\" \"npm run dev:web\" \"npx ngrok http 3000\" \"npx cloudflared tunnel --url http://localhost:5173\"",
+    "dev": "concurrently -n backend,web -c blue,green \"npm run dev:backend\" \"npm run dev:web\"",
     "dev:backend": "npm run dev --workspace apps/backend",
     "dev:web": "npm run dev --workspace apps/web",
-    "server": "npx ts-node apps/backend/src/server.ts",
-    "tunnel": "npx ngrok http 3000",
-    "dev:api": "npm run server",
+    "tunnel:api": "npx ngrok http 3000",
+    "tunnel:liff": "npx cloudflared tunnel --url http://localhost:5173",
     "build": "npm run build --workspace apps/backend && npm run build --workspace apps/web",
     "lint": "npm run lint --workspace apps/backend && npm run lint --workspace apps/web"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

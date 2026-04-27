@@ -17,7 +17,8 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_DB_SCHEMA: z.string().default('public'),
-  WEB_BASE_URL: z.string().default('http://localhost:5173')
+  WEB_BASE_URL: z.string().default('http://localhost:5173'),
+  LIFF_ID:  z.string().default("2009908241-5ii7GhO0")
 });
 
 export const env = envSchema.parse(process.env);

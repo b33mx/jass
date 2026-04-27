@@ -80,8 +80,15 @@ flowchart TD
     C -->|สร้าง| E[เปิด LIFF Form กรอกข้อมูลพนักงาน]
     E --> F[Validate + INSERT employees]
     F --> G[Reply: สร้างสำเร็จ ชื่อ X]
-    C -->|แก้ไข| H[เลือกพนักงาน → เปิด LIFF Form แก้ไข]
-    H --> I[UPDATE employees]
+    C -->|แก้ไข| H[เปิด LIFF /employees/edit — หน้าเลือกพนักงาน]
+    H --> H1[แสดงรายชื่อพนักงาน active ทั้งหมด]
+    H1 --> H2[เสมียนเลือกพนักงาน]
+    H2 --> H3[เปิดฟอร์มแก้ไข pre-filled ดีไซน์เหมือน AddEmployee]
+    H3 --> H4[เสมียนแก้ไขข้อมูล แล้วกดยืนยัน]
+    H4 --> H5{Modal Confirm}
+    H5 -->|ยืนยัน| I[PATCH /api/employees/:id — UPDATE employees]
+    H5 -->|ยกเลิก| H3
+    I --> I2[แสดง สำเร็จ ✓ แล้วปิด LIFF]
     C -->|ลบ| J[เลือกพนักงาน → Confirm → SET is_active = false]
 ```
 
