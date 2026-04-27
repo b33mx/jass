@@ -1,0 +1,2 @@
+-- Seed placeholder
+-- TODO: insert baseline roles and sample employees for local development

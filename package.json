@@ -1,0 +1,22 @@
+{
+  "name": "jass-payroll-lineoa",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/backend",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace apps/backend & npm run dev --workspace apps/web",
+    "dev:backend": "npm run dev --workspace apps/backend",
+    "dev:web": "npm run dev --workspace apps/web",
+    "server": "npx ts-node apps/backend/src/server.ts",
+    "tunnel": "npx ngrok http 3000",
+    "dev:api": "npm run server",
+    "build": "npm run build --workspace apps/backend && npm run build --workspace apps/web",
+    "lint": "npm run lint --workspace apps/backend && npm run lint --workspace apps/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

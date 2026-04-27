@@ -1,0 +1,2 @@
+-- Initial schema placeholder
+-- TODO: define tables for employees, attendance, worklogs, payroll_periods, payroll_results
