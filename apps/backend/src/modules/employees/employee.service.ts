@@ -1,4 +1,10 @@
-import { insertEmployee, selectAllEmployees, selectEmployeeById, updateEmployeeById } from './employee.repository.ts';
+import {
+  insertEmployee,
+  selectAllEmployees,
+  selectEmployeeById,
+  softDeleteEmployeeById,
+  updateEmployeeById,
+} from './employee.repository.ts';
 import type { CreateEmployeeDto, Employee } from './employee.types.ts';
 
 function calcOtRate(wage: number): number {
@@ -29,4 +35,8 @@ export async function updateEmployee(id: number, dto: CreateEmployeeDto): Promis
     wage: dto.wage,
     ot_rate: calcOtRate(dto.wage),
   });
+}
+
+export async function deleteEmployee(id: number): Promise<Employee | null> {
+  return softDeleteEmployeeById(id);
 }

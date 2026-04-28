@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getEmployeeById, updateEmployee } from '../api/employee.api';
+import { deleteEmployee, getEmployeeById, updateEmployee } from '../api/employee.api';
 
 type FieldErrors = { firstName?: string; lastName?: string; wage?: string };
 type Toast = { type: 'success' | 'error'; message: string } | null;
@@ -17,7 +17,9 @@ export function EditEmployeePage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [toast, setToast] = useState<Toast>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const wage = parseFloat(form.wage) || 0;
   const otRate = wage > 0 ? (wage / 8) * 1.5 : null;
@@ -91,6 +93,25 @@ export function EditEmployeePage() {
     }
   }
 
+  async function handleDeleteSubmit() {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      await deleteEmployee(parseInt(id, 10));
+      setShowDeleteConfirm(false);
+      setToast({ type: 'success', message: 'ลบพนักงานสำเร็จ!' });
+      setTimeout(() => navigate('/employees/edit'), 1200);
+    } catch (err) {
+      setShowDeleteConfirm(false);
+      setToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (loadingData) {
     return (
       <div className="mx-auto max-w-md">
@@ -124,23 +145,30 @@ export function EditEmployeePage() {
             <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
             <div className="absolute -right-2 top-10 h-16 w-16 rounded-full bg-white/5" />
 
-            <div className="relative flex items-center gap-4">
-              <button
-                onClick={() => navigate('/employees/edit')}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm transition hover:bg-white/30"
-              >
-                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-                <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
+            <div className="relative">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => navigate('/employees/edit')}
+                  aria-label="ย้อนกลับไปหน้ารายการพนักงาน"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-brandRed shadow-sm ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-md active:translate-y-0"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>ย้อนกลับ</span>
+                </button>
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">แก้ไขพนักงาน</h1>
-                <p className="mt-0.5 text-sm text-white/60">{originalName}</p>
+
+              <div className="mt-4 flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+                  <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white">แก้ไขพนักงาน</h1>
+                  <p className="mt-0.5 text-sm text-white/60">{originalName}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -237,13 +265,22 @@ export function EditEmployeePage() {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={handleConfirmClick}
-              className="mt-4 w-full rounded-2xl bg-brandRed py-4 text-sm font-bold tracking-wide text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 active:scale-[0.98]"
-            >
-              ยืนยันการแก้ไข
-            </button>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="rounded-2xl border border-red-200 bg-red-50 py-4 text-sm font-bold tracking-wide text-red-600 transition hover:bg-red-100 active:scale-[0.98]"
+              >
+                ลบพนักงาน
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClick}
+                className="rounded-2xl bg-brandRed py-4 text-sm font-bold tracking-wide text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 active:scale-[0.98]"
+              >
+                ยืนยันการแก้ไข
+              </button>
+            </div>
 
           </div>
         </div>
@@ -270,15 +307,13 @@ export function EditEmployeePage() {
             </div>
 
             <div className="px-6 py-5">
-              <p className="text-sm text-zinc-500">ต้องการแก้ไขข้อมูลพนักงานนี้ใช่ไหม?</p>
+              <p className="text-sm text-zinc-500">ต้องการบันทึกการเปลี่ยนแปลงข้อมูลพนักงานนี้ใช่ไหม?</p>
 
               <div className="mt-4 rounded-2xl bg-zinc-50 px-4 py-3 ring-1 ring-zinc-100">
                 <p className="text-sm font-semibold text-zinc-800">
                   {form.firstName} {form.lastName}
                 </p>
-                <p className="mt-0.5 text-xs text-zinc-400">
-                  ค่าแรงใหม่: {parseFloat(form.wage).toLocaleString('th-TH')} บาท / วัน
-                </p>
+                <p className="mt-0.5 text-xs text-zinc-400">ค่าแรง: {wage.toLocaleString('th-TH')} บาท / วัน</p>
               </div>
 
               <div className="mt-5 flex gap-3">
@@ -301,6 +336,58 @@ export function EditEmployeePage() {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => !deleting && setShowDeleteConfirm(false)}
+          />
+          <div className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-xl">
+
+            <div className="bg-red-600 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                  <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-base font-bold text-white">ยืนยันการลบพนักงาน</h2>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <p className="text-sm text-zinc-600">เมื่อลบแล้วจะไม่แสดงพนักงานในรายการแก้ไขอีก</p>
+
+              <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 ring-1 ring-red-100">
+                <p className="text-sm font-semibold text-zinc-800">
+                  {form.firstName} {form.lastName}
+                </p>
+                <p className="mt-0.5 text-xs text-zinc-500">ค่าแรง: {wage.toLocaleString('th-TH')} บาท / วัน</p>
+              </div>
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  className="flex-1 rounded-2xl border border-zinc-200 py-3 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteSubmit}
+                  disabled={deleting}
+                  className="flex-1 rounded-2xl bg-red-600 py-3 text-sm font-bold text-white shadow-md shadow-red-600/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deleting ? 'กำลังลบ...' : 'ยืนยันการลบ'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

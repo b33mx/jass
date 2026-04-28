@@ -75,8 +75,8 @@ export function EditEmployeeSelectPage() {
             <div className="space-y-2">
               {employees.map((emp) => (
                 <button
-                  key={emp.id}
-                  onClick={() => navigate(`/employees/${emp.id}/edit`)}
+                  key={emp.employee_id}
+                  onClick={() => navigate(`/employees/${emp.employee_id}/edit`)}
                   className="flex w-full items-center justify-between rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3.5 text-left transition hover:border-brandRed/30 hover:bg-red-50 active:scale-[0.99]"
                 >
                   <div className="flex items-center gap-3">

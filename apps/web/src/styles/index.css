@@ -5,3 +5,22 @@
 :root {
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
 }
+
+/* Prevent LIFF/WebKit date controls from forcing overflow on small screens */
+input.date-input[type='date'] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input.date-input[type='date']::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+
+input.date-input[type='date']::-webkit-datetime-edit {
+  padding: 0;
+}

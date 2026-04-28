@@ -52,21 +52,21 @@ export function createEmployeeFlexMessage(liffId: string): LineMessage {
             height: 'sm',
             action: {
               type: 'uri',
-              label: 'แก้ไข',
+              label: 'แก้ไข/ลบ',
               uri: `${liffBase}/employees/edit`
             }
           },
-          {
-            type: 'button',
-            style: 'primary',
-            color: '#db2121',
-            height: 'sm',
-            action: {
-              type: 'message',
-              label: 'ลบ',
-              text: 'ลบ'
-            }
-          }
+          // {
+          //   type: 'button',
+          //   style: 'primary',
+          //   color: '#db2121',
+          //   height: 'sm',
+          //   action: {
+          //     type: 'message',
+          //     label: 'ลบ',
+          //     text: 'ลบ'
+          //   }
+          // }
         ]
       }
     }

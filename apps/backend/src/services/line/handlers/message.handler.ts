@@ -1,4 +1,5 @@
 import { replyToLine } from '../client.ts';
+import { createAttendanceFlexMessage } from '../messages/attendance-menu.ts';
 import { createEmployeeFlexMessage } from '../messages/employee-menu.ts';
 import type { LineEvent } from '../types.ts';
 import { env } from '../../../config/env.ts';
@@ -6,6 +7,7 @@ import { getAllEmployees } from '../../../modules/employees/employee.service.ts'
 
 const TRIGGER_MENU = '>พนักงาน';
 const TRIGGER_LIST = '>รายชื่อ';
+const TRIGGER_ATTENDANCE = '>ลงเวลา';
 
 export async function handleLineEvent(event: LineEvent): Promise<void> {
   if (event.type !== 'message') return;
@@ -15,6 +17,11 @@ export async function handleLineEvent(event: LineEvent): Promise<void> {
 
   if (userText === TRIGGER_MENU) {
     await replyToLine(event.replyToken, [createEmployeeFlexMessage(env.LIFF_ID)]);
+    return;
+  }
+
+  if (userText === TRIGGER_ATTENDANCE) {
+    await replyToLine(event.replyToken, [createAttendanceFlexMessage(env.LIFF_ID)]);
     return;
   }
 

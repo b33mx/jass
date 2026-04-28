@@ -1,10 +1,14 @@
 import { Route, Routes } from 'react-router-dom';
 import { AppLayout } from './layouts/AppLayout';
-import { HomePage } from './pages/HomePage';
+import { AttendanceOverviewPage } from './pages/AttendanceOverviewPage';
+import { AttendancePage } from './pages/AttendancePage';
 import { AddEmployeePage } from './pages/AddEmployeePage';
 import { AddEmployeeSuccessPage } from './pages/AddEmployeeSuccessPage';
-import { EditEmployeeSelectPage } from './pages/EditEmployeeSelectPage';
+import { CreatePeriodPage } from './pages/CreatePeriodPage';
+import { CreateTasksPage } from './pages/CreateTasksPage';
 import { EditEmployeePage } from './pages/EditEmployeePage';
+import { EditEmployeeSelectPage } from './pages/EditEmployeeSelectPage';
+import { HomePage } from './pages/HomePage';
 
 export default function App() {
   return (
@@ -15,6 +19,10 @@ export default function App() {
         <Route path="/employees/new/success" element={<AddEmployeeSuccessPage />} />
         <Route path="/employees/edit" element={<EditEmployeeSelectPage />} />
         <Route path="/employees/:id/edit" element={<EditEmployeePage />} />
+        <Route path="/attendance" element={<AttendanceOverviewPage />} />
+        <Route path="/attendance/log" element={<AttendancePage />} />
+        <Route path="/periods/new" element={<CreatePeriodPage />} />
+        <Route path="/tasks/new" element={<CreateTasksPage />} />
       </Routes>
     </AppLayout>
   );

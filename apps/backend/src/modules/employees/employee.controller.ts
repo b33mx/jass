@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { createEmployee, getAllEmployees, getEmployeeById, updateEmployee } from './employee.service.ts';
+import { createEmployee, deleteEmployee, getAllEmployees, getEmployeeById, updateEmployee } from './employee.service.ts';
 
 const employeeSchema = z.object({
   firstName: z.string().min(1, 'ต้องระบุชื่อ'),
@@ -73,5 +73,25 @@ export async function handleUpdateEmployee(req: Request, res: Response) {
   } catch (err) {
     console.error('[employee] update failed:', err);
     res.status(500).json({ error: 'ไม่สามารถแก้ไขข้อมูลพนักงานได้' });
+  }
+}
+
+export async function handleDeleteEmployee(req: Request, res: Response) {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: 'id ไม่ถูกต้อง' });
+    return;
+  }
+
+  try {
+    const employee = await deleteEmployee(id);
+    if (!employee) {
+      res.status(404).json({ error: 'ไม่พบพนักงาน' });
+      return;
+    }
+    res.json({ success: true, employee });
+  } catch (err) {
+    console.error('[employee] delete failed:', err);
+    res.status(500).json({ error: 'ไม่สามารถลบข้อมูลพนักงานได้' });
   }
 }

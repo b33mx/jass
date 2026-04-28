@@ -5,7 +5,7 @@ export interface CreateEmployeePayload {
 }
 
 export interface Employee {
-  id: number;
+  employee_id: number;
   first_name: string;
   last_name: string;
   wage: number;
@@ -65,4 +65,15 @@ export async function updateEmployee(id: number, payload: CreateEmployeePayload)
   }
 
   return res.json() as Promise<Employee>;
+}
+
+export async function deleteEmployee(id: number): Promise<void> {
+  const res = await fetch(`/api/employees/${id}`, {
+    method: 'DELETE',
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? 'ไม่สามารถลบข้อมูลพนักงานได้');
+  }
 }

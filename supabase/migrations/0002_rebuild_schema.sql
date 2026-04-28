@@ -1,3 +1,10 @@
+-- drop old tables if they exist (handles partial old schema)
+drop table if exists attendance cascade;
+drop table if exists tasks cascade;
+drop table if exists periods cascade;
+drop table if exists employees cascade;
+drop function if exists set_updated_at cascade;
+
 -- employees
 create table employees (
   employee_id  int generated always as identity primary key,
@@ -27,6 +34,7 @@ create table periods (
   period_id   int generated always as identity primary key,
   start_date  date        not null,
   end_date    date        not null,
+  is_active   boolean     not null default true,
   created_at  timestamptz not null default now(),
   constraint periods_date_check check (end_date >= start_date)
 );
@@ -40,7 +48,8 @@ create table attendance (
   morning_check    boolean          not null default false,
   afternoon_check  boolean          not null default false,
   ot               double precision not null default 0 check (ot >= 0),
-  created_at       timestamptz      not null default now()
+  created_at       timestamptz      not null default now(),
+  constraint attendance_unique unique (attendance_date, employee_id, period_id)
 );
 
 -- tasks
