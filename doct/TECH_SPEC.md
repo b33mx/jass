@@ -1,7 +1,7 @@
 # JASS Payroll LINE OA — Technical Specification
 
-**Version:** 1.0  
-**Date:** 2026-04-27  
+**Version:** 1.1  
+**Date:** 2026-04-28  
 **Author:** Angela  
 **Related PRD:** PRD.md
 
@@ -13,39 +13,9 @@ Spec นี้ครอบคลุม architecture, data model, API design, แ
 
 ---
 
-## 2. Background & Context
+## 2. System Design
 
-ปัจจุบัน project อยู่ใน scaffold phase:
-- Backend: Express + TypeScript พร้อม webhook route `/webhook/line`
-- Frontend: React + Vite + LIFF พร้อม basic layout
-- DB: Supabase project ตั้งค่าแล้ว แต่ schema ยังไม่มี
-- LINE: webhook รับ event ได้ แต่ handle แค่ `>พนักงาน` trigger
-
-สิ่งที่ต้องสร้างทั้งหมด: DB schema, service layer, LIFF forms, payroll engine
-
----
-
-## 3. Goals
-
-- กำหนด schema ที่ support ทุก feature ใน v1 โดยไม่ต้อง migrate ใหญ่ทีหลัง
-- ออกแบบ LINE message flow ให้ใช้งานง่ายโดยไม่ต้องพิมพ์คำสั่งยาวๆ
-- แยก business logic ออกจาก LINE handler ให้ testable
-- รองรับ LIFF สำหรับ form ที่ซับซ้อน (form input ที่ LINE chat ทำไม่ได้)
-
----
-
-## 4. Non-Goals
-
-- ไม่ทำ multi-tenant ใน v1 (1 LINE OA = 1 organization)
-- ไม่ทำ real-time push notification (ไม่ใช่ push message ตามกำหนดเวลา)
-- ไม่ทำ PDF export ใน v1
-- ไม่ทำ unit test framework setup ใน phase 0 (เพิ่มทีหลัง)
-
----
-
-## 5. System Design
-
-### 5.1 Architecture Overview
+### 2.1 Architecture Overview
 
 ```
 LINE App (User)
@@ -63,240 +33,194 @@ Backend (Express + TypeScript)
     │       ├── Intent Detection (text matching)
     │       └── dispatch → Service Layer
     │
-    ├── Service Layer (pure business logic)
-    │       ├── EmployeeService
-    │       ├── AttendanceService
-    │       ├── PayrollService
-    │       └── ReportService
+    ├── Module Layer (per feature)
+    │       ├── employees/ (controller, service, repository, route)
+    │       ├── periods/   (controller, service, repository, route)
+    │       └── attendance/(controller, service, repository, route)
     │
     └── Repository Layer (Supabase client)
-            ├── employeeRepository
-            ├── attendanceRepository
-            ├── payrollRepository
-            └── workLogRepository
 
 LIFF (React + Vite)
     │
     │ (3) User กด LIFF URL ใน LINE
     ▼
 Web App (React)
-    ├── liff.init() → get userId, displayName
-    ├── Form pages (Employee CRUD, Attendance, etc.)
-    └── POST /api/* → Backend REST API
+    ├── Pages (Employee CRUD, Attendance, Period)
+    └── POST/GET /api/* → Backend REST API
 ```
 
-### 5.2 Components
+### 2.2 Module Structure
 
-| Component | Responsibility | Tech |
-|-----------|---------------|------|
-| LINE Webhook Handler | รับ event จาก LINE, route ตาม intent | Express Route + TypeScript |
-| Intent Detector | แปลง text/postback → action | Pattern matching (ไม่ใช้ AI) |
-| Service Layer | Business logic, validation, orchestration | TypeScript classes/functions |
-| Repository Layer | CRUD operations กับ Supabase | Supabase JS client |
-| Payroll Engine | คำนวณเงินเดือนจาก attendance + rates | Pure TypeScript function |
-| LIFF Web App | Form UI สำหรับ input ที่ซับซ้อน | React + Tailwind |
-| LINE Flex Builder | สร้าง Flex Message JSON | TypeScript factory functions |
+| Module | Files | Responsibility |
+|--------|-------|----------------|
+| employees | controller, service, repository, route | CRUD พนักงาน + คำนวณ ot_rate |
+| periods | controller, service, repository, route | สร้างงวด, หางวด active |
+| attendance | controller, service, repository, route | บันทึกเวลา, หาวันที่ขาด, upsert batch |
 
-### 5.3 Data Model
+---
+
+## 3. Data Model (Actual Schema)
+
+### 3.1 ER Diagram
 
 ```mermaid
 erDiagram
     EMPLOYEES {
-        uuid id PK
-        string name
-        string position
-        string wage_type "daily | monthly"
-        decimal rate_daily
-        decimal rate_monthly
-        decimal rate_ot_per_hour
+        int employee_id PK
+        text first_name
+        text last_name
+        numeric wage "ค่าแรง บาท/วัน"
+        numeric ot_rate "wage/8×1.5 คำนวณอัตโนมัติ"
         boolean is_active
         timestamptz created_at
         timestamptz updated_at
     }
 
-    ATTENDANCE {
-        uuid id PK
-        uuid employee_id FK
-        date work_date
-        boolean shift_morning "เช้า checkbox"
-        boolean shift_afternoon "บ่าย checkbox"
-        decimal ot_hours "OT input ชั่วโมง"
-        decimal hours_worked "GENERATED: (เช้า?4:0)+(บ่าย?4:0)+OT"
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    WORK_LOGS {
-        uuid id PK
-        date work_date "วันที่ของงานนี้"
-        text description "รายละเอียดงาน"
-        uuid[] responsible_employee_ids "ผู้รับผิดชอบ (หลายคน)"
-        timestamptz created_at
-    }
-
-    PAYROLL_PERIODS {
-        uuid id PK
+    PERIODS {
+        int period_id PK
         date start_date
         date end_date
-        string status "open | locked"
-        timestamptz created_at
-        timestamptz locked_at
-    }
-
-    PAYROLL_RESULTS {
-        uuid id PK
-        uuid period_id FK
-        uuid employee_id FK
-        int working_days
-        decimal total_hours
-        decimal ot_hours
-        decimal gross_amount
-        jsonb calculation_detail
-        timestamptz calculated_at
-    }
-
-    LINE_USERS {
-        uuid id PK
-        string line_user_id UK
-        string role "clerk | admin"
-        string display_name
+        boolean is_active "true = งวดที่เปิดอยู่"
         timestamptz created_at
     }
 
-    EMPLOYEES ||--o{ ATTENDANCE : "has (per day)"
-    EMPLOYEES ||--o{ PAYROLL_RESULTS : "included in"
-    PAYROLL_PERIODS ||--o{ PAYROLL_RESULTS : "contains"
-    %% WORK_LOGS.responsible_employee_ids = uuid[] ไม่ใช่ FK constraint
-    %% แต่ reference ไปที่ employees.id หลายคนต่อ 1 task
+    ATTENDANCE {
+        int attendance_id PK
+        date attendance_date
+        int employee_id FK
+        int period_id FK
+        boolean morning_check "เช้า"
+        boolean afternoon_check "บ่าย"
+        double_precision ot "OT ชั่วโมง (decimal)"
+        timestamptz created_at
+    }
+
+    TASKS {
+        int task_id PK
+        date task_date
+        text task "ชื่องาน"
+        text detail "รายละเอียด (nullable)"
+        text employee_ids "comma-separated employee_id"
+        timestamptz created_at
+    }
+
+    EMPLOYEES ||--o{ ATTENDANCE : "has"
+    PERIODS ||--o{ ATTENDANCE : "contains"
 ```
 
-### 5.4 SQL Schema (Supabase Migration)
+### 3.2 SQL Schema
 
 ```sql
 -- employees
-CREATE TABLE employees (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  position text,
-  wage_type text NOT NULL CHECK (wage_type IN ('daily', 'monthly')),
-  rate_daily numeric(10,2) DEFAULT 0,
-  rate_monthly numeric(10,2) DEFAULT 0,
-  rate_ot_per_hour numeric(10,2) DEFAULT 0,
-  is_active boolean DEFAULT true,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
+create table employees (
+  employee_id  int generated always as identity primary key,
+  first_name   text          not null,
+  last_name    text          not null,
+  wage         numeric(10,2) not null check (wage >= 0),
+  ot_rate      numeric(10,2) not null check (ot_rate >= 0),
+  is_active    boolean       not null default true,
+  created_at   timestamptz   not null default now(),
+  updated_at   timestamptz   not null default now()
 );
 
--- attendance (shift-based — เช้า/บ่าย checkbox แทน check_in/check_out)
-CREATE TABLE attendance (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id uuid REFERENCES employees(id) ON DELETE CASCADE,
-  work_date date NOT NULL,
-  shift_morning boolean NOT NULL DEFAULT false,   -- เช้า checkbox
-  shift_afternoon boolean NOT NULL DEFAULT false, -- บ่าย checkbox
-  ot_hours numeric(4,1) NOT NULL DEFAULT 0,       -- OT input (ทศนิยม 0.5 ได้)
-  hours_worked numeric(5,1) GENERATED ALWAYS AS (
-    (CASE WHEN shift_morning   THEN 4.0 ELSE 0.0 END) +
-    (CASE WHEN shift_afternoon THEN 4.0 ELSE 0.0 END) +
-    ot_hours
-  ) STORED,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now(),
-  UNIQUE(employee_id, work_date)
+-- periods
+create table periods (
+  period_id   int generated always as identity primary key,
+  start_date  date        not null,
+  end_date    date        not null,
+  is_active   boolean     not null default true,
+  created_at  timestamptz not null default now(),
+  constraint periods_date_check check (end_date >= start_date)
 );
 
--- work_logs (task-level — 1 งาน มีผู้รับผิดชอบได้หลายคน)
--- responsible_employee_ids = uuid[] ไม่ผูก FK constraint เพื่อ flexibility
--- ตอน query ใช้ WHERE id = ANY(responsible_employee_ids)
-CREATE TABLE work_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  work_date date NOT NULL,
-  description text NOT NULL,
-  responsible_employee_ids uuid[] NOT NULL DEFAULT '{}',
-  created_at timestamptz DEFAULT now()
-);
--- index สำหรับ query "งานของพนักงาน X"
-CREATE INDEX idx_work_logs_responsible ON work_logs USING GIN (responsible_employee_ids);
-
--- payroll_periods
-CREATE TABLE payroll_periods (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  start_date date NOT NULL,
-  end_date date NOT NULL,
-  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'locked')),
-  created_at timestamptz DEFAULT now(),
-  locked_at timestamptz
+-- attendance
+create table attendance (
+  attendance_id    int generated always as identity primary key,
+  attendance_date  date             not null,
+  employee_id      int              not null references employees(employee_id),
+  period_id        int              not null references periods(period_id),
+  morning_check    boolean          not null default false,
+  afternoon_check  boolean          not null default false,
+  ot               double precision not null default 0 check (ot >= 0),
+  created_at       timestamptz      not null default now(),
+  constraint attendance_unique unique (attendance_date, employee_id, period_id)
 );
 
--- payroll_results
-CREATE TABLE payroll_results (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  period_id uuid REFERENCES payroll_periods(id),
-  employee_id uuid REFERENCES employees(id),
-  working_days int DEFAULT 0,
-  total_hours numeric(6,2) DEFAULT 0,
-  ot_hours numeric(5,2) DEFAULT 0,
-  gross_amount numeric(12,2) DEFAULT 0,
-  calculation_detail jsonb,
-  calculated_at timestamptz DEFAULT now(),
-  UNIQUE(period_id, employee_id)
-);
-
--- line_users (role management)
-CREATE TABLE line_users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  line_user_id text UNIQUE NOT NULL,
-  role text NOT NULL DEFAULT 'clerk' CHECK (role IN ('clerk', 'admin')),
-  display_name text,
-  created_at timestamptz DEFAULT now()
+-- tasks
+create table tasks (
+  task_id       int generated always as identity primary key,
+  task_date     date        not null,
+  task          text        not null,
+  detail        text,
+  employee_ids  text        not null,
+  created_at    timestamptz not null default now()
 );
 ```
 
-### 5.5 API Endpoints
+### 3.3 Business Rules
 
-#### REST (ใช้กับ LIFF)
+- `ot_rate` คำนวณอัตโนมัติตอนสร้าง/แก้ไข employee: `wage / 8 × 1.5`
+- "งวด active" = `is_active = true AND today BETWEEN start_date AND end_date`
+- OT เก็บเป็น decimal hours (เช่น 1.5 = 1 ชม. 30 น.) — UI แสดงเป็น 2 input (ชม./น.) แล้ว convert
+- attendance มี unique constraint ต่อ (date, employee, period) → ใช้ upsert ได้
 
-| Method | Path | Description | Role |
-|--------|------|-------------|------|
-| GET | /api/employees | รายชื่อพนักงาน active | clerk, admin |
-| POST | /api/employees | สร้างพนักงานใหม่ | clerk |
-| PATCH | /api/employees/:id | แก้ไขข้อมูลพนักงาน | clerk |
-| DELETE | /api/employees/:id | deactivate พนักงาน | clerk |
-| POST | /api/attendance | บันทึก/แก้ไขเวลาทำงาน | clerk |
-| GET | /api/attendance?employeeId=&periodId= | ดูเวลาทำงาน | clerk, admin |
-| POST | /api/work-logs | บันทึกรายละเอียดงาน | clerk |
-| GET | /api/payroll-periods | รายการงวดทั้งหมด | clerk, admin |
-| POST | /api/payroll-periods | สร้างงวดใหม่ | clerk |
-| POST | /api/payroll-periods/:id/calculate | สั่งคำนวณเงินเดือน | clerk |
-| PATCH | /api/payroll-periods/:id/lock | ล็อกงวด | clerk |
-| GET | /api/payroll-periods/:id/results | ดูผลคำนวณ | clerk, admin |
-| GET | /health | Health check | public |
-| POST | /webhook/line | LINE webhook | LINE Platform |
+---
 
-#### Error Format (Standard)
+## 4. API Endpoints
 
+### 4.1 REST (ใช้กับ LIFF)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/employees` | รายชื่อพนักงาน active ทั้งหมด |
+| POST | `/api/employees` | สร้างพนักงานใหม่ |
+| GET | `/api/employees/:id` | ดูพนักงาน 1 คน |
+| PATCH | `/api/employees/:id` | แก้ไขข้อมูลพนักงาน |
+| DELETE | `/api/employees/:id` | deactivate พนักงาน |
+| GET | `/api/periods/active` | หางวดที่ active ณ วันนี้ → `{ period: Period \| null }` |
+| POST | `/api/periods` | สร้างงวดใหม่ `{ start_date, end_date }` |
+| GET | `/api/attendance/missing-dates?period_id=X` | วันที่ในงวดที่ยังไม่มีข้อมูล attendance → `string[]` |
+| GET | `/api/attendance?period_id=X&date=Y` | ดู attendance ของวันที่ระบุในงวด → `Attendance[]` |
+| POST | `/api/attendance/batch` | upsert attendance ทุกพนักงานสำหรับวันที่ระบุ |
+| GET | `/health` | Health check |
+| POST | `/webhook/line` | LINE webhook |
+
+### 4.2 Request/Response Schemas
+
+**POST /api/attendance/batch**
 ```json
 {
-  "success": false,
-  "error": "human-readable message",
-  "code": "EMPLOYEE_NOT_FOUND"
+  "period_id": 1,
+  "attendance_date": "2026-04-28",
+  "records": [
+    {
+      "employee_id": 1,
+      "morning_check": true,
+      "afternoon_check": false,
+      "ot": 1.5
+    }
+  ]
 }
 ```
 
-#### Success Format
-
+**POST /api/periods**
 ```json
-{
-  "success": true,
-  "data": { ... }
-}
+{ "start_date": "2026-04-01", "end_date": "2026-04-30" }
 ```
 
 ---
 
-## 6. LINE Message Flow
+## 5. LINE Message Flow
 
-### 6.1 Sequence: ลงเวลางาน (2-Step Webview)
+### 5.1 Intent Trigger Map
+
+| User พิมพ์ | Intent | Action |
+|-----------|--------|--------|
+| `>พนักงาน` | EMPLOYEE_MENU | แสดง Flex: รายชื่อ / สร้าง / แก้ไข |
+| `>รายชื่อ` | LIST_EMPLOYEES | reply text list พนักงาน active |
+| `>ลงเวลา` | ATTENDANCE_WEBVIEW | reply Flex พร้อมปุ่มเปิด LIFF `/attendance` |
+
+### 5.2 Sequence: ลงเวลางาน
 
 ```mermaid
 sequenceDiagram
@@ -308,57 +232,39 @@ sequenceDiagram
 
     เสมียน->>LINE: พิมพ์ ">ลงเวลา"
     LINE->>API: POST /webhook/line
-    API->>API: verifySignature + detectIntent
-    API->>LINE: reply Flex พร้อม LIFF URL (/attendance/log)
+    API->>LINE: reply Flex พร้อม LIFF URL (/attendance)
     เสมียน->>LIFF: เปิด LIFF Webview
 
-    Note over LIFF: Step 1 — ตารางพนักงาน
-    LIFF->>API: GET /api/employees
-    API->>DB: SELECT employees WHERE is_active = true
-    DB-->>LIFF: employees[]
-    LIFF-->>เสมียน: แสดงตาราง: ชื่อ | เช้า☑ | บ่าย☑ | OT[input]
-    เสมียน->>LIFF: tick พนักงานที่มา + ใส่ OT
-    เสมียน->>LIFF: กด ถัดไป →
+    LIFF->>API: GET /api/periods/active
+    API->>DB: SELECT periods WHERE is_active=true AND today BETWEEN start_date AND end_date
+    DB-->>LIFF: period | null
 
-    Note over LIFF: Step 2 — รายการงาน
-    LIFF-->>เสมียน: แสดงหน้าบันทึกงาน
-    เสมียน->>LIFF: กด + เพิ่มรายการงาน (หลายรอบได้)
-    เสมียน->>LIFF: กรอก description + เลือก responsible (multi-select)
-    เสมียน->>LIFF: กด บันทึกทั้งหมด ✓
-
-    LIFF->>API: POST /api/attendance (batch: ทุก employee ที่ tick)
-    API->>DB: UPSERT attendance หลายแถวพร้อมกัน
-    DB-->>API: ok
-    LIFF->>API: POST /api/work-logs (batch: ทุก task ที่กรอก)
-    API->>DB: INSERT work_logs หลายแถว
-    DB-->>API: ok
-    API-->>LIFF: { success: true }
-    LIFF-->>เสมียน: แสดง บันทึกสำเร็จ ✓ + ปิด LIFF
+    alt ไม่มีงวด active
+        LIFF-->>เสมียน: Empty state + ปุ่ม "สร้างงวดใหม่"
+        เสมียน->>LIFF: กดสร้างงวด → /periods/new
+        เสมียน->>LIFF: กรอก start_date, end_date → submit
+        LIFF->>API: POST /api/periods
+        API->>DB: INSERT periods
+        DB-->>LIFF: period created
+        LIFF-->>เสมียน: redirect กลับ /attendance
+    else มีงวด active
+        LIFF->>API: GET /api/attendance/missing-dates?period_id=X
+        API->>DB: หาวันทั้งหมดใน range ที่ยังไม่มี attendance
+        DB-->>LIFF: missing dates[]
+        LIFF-->>เสมียน: Dropdown วันที่ยังไม่ได้ลง
+        เสมียน->>LIFF: เลือกวันที่
+        LIFF->>API: GET /api/employees + GET /api/attendance?period_id=X&date=Y
+        DB-->>LIFF: employees[] + existing attendance[]
+        LIFF-->>เสมียน: ตาราง: ชื่อ | เช้า☑ | บ่าย☑ | OT[ชม][น]
+        เสมียน->>LIFF: tick + ใส่ OT → กด "บันทึกการลงเวลา"
+        LIFF->>API: POST /api/attendance/batch
+        API->>DB: UPSERT attendance (conflict: date+employee+period)
+        DB-->>LIFF: saved
+        LIFF-->>เสมียน: toast "บันทึกสำเร็จ" + ลบวันออกจาก dropdown
+    end
 ```
 
-### 6.2 Sequence: คำนวณเงินเดือน
-
-```mermaid
-sequenceDiagram
-    actor เสมียน as เสมียน (LINE)
-    participant API as Backend API
-    participant Engine as Payroll Engine
-    participant DB as Supabase DB
-
-    เสมียน->>API: POST /webhook (">คำนวณ" → เลือกงวด)
-    API->>DB: GET payroll_period + attendance ในช่วง
-    DB-->>API: attendance records
-    API->>Engine: calculatePayroll(employees, attendance)
-    Engine->>Engine: loop พนักงานแต่ละคน
-    Engine->>Engine: gross = days × rate + OT × ot_rate
-    Engine-->>API: payroll_results[]
-    API->>DB: UPSERT payroll_results
-    DB-->>API: saved
-    API->>API: formatSummaryMessage
-    API-->>เสมียน: reply Flex: ยอดรวมแต่ละคน
-```
-
-### 6.3 Sequence: แก้ไขพนักงาน (Edit Employee Flow)
+### 5.3 Sequence: จัดการพนักงาน
 
 ```mermaid
 sequenceDiagram
@@ -368,94 +274,46 @@ sequenceDiagram
     participant DB as Supabase DB
     participant LIFF as LIFF Web App
 
-    เสมียน->>LINE: กดปุ่ม "แก้ไข" ใน Flex Menu
+    เสมียน->>LINE: กดปุ่ม "แก้ไข/ลบ" ใน Flex Menu
     LINE->>LIFF: เปิด LIFF URL /employees/edit
 
-    Note over LIFF: หน้าเลือกพนักงาน
     LIFF->>API: GET /api/employees
     API->>DB: SELECT employees WHERE is_active = true
     DB-->>LIFF: employees[]
-    LIFF-->>เสมียน: แสดงรายชื่อพนักงาน active ทั้งหมด (card list)
-    เสมียน->>LIFF: กดเลือกพนักงานที่ต้องการแก้ไข
+    LIFF-->>เสมียน: card list รายชื่อพนักงาน active
 
-    Note over LIFF: หน้าฟอร์มแก้ไข
+    เสมียน->>LIFF: กดเลือกพนักงาน
     LIFF->>API: GET /api/employees/:id
-    API->>DB: SELECT employee WHERE id = :id
     DB-->>LIFF: employee record
-    LIFF-->>เสมียน: แสดงฟอร์ม pre-filled (ดีไซน์เหมือน AddEmployee — header แดง, body ขาว)
-    เสมียน->>LIFF: แก้ไขข้อมูล แล้วกดปุ่ม "ยืนยันการแก้ไข"
+    LIFF-->>เสมียน: ฟอร์มแก้ไข pre-filled
 
-    Note over LIFF: Modal Confirm
-    LIFF-->>เสมียน: Modal: "ยืนยันการแก้ไขข้อมูลพนักงาน [ชื่อ] ใช่ไหม?"
-    เสมียน->>LIFF: กด "ยืนยัน"
-
+    เสมียน->>LIFF: แก้ไขข้อมูล → กดยืนยัน
+    LIFF-->>เสมียน: Modal confirm
+    เสมียน->>LIFF: ยืนยัน
     LIFF->>API: PATCH /api/employees/:id
-    API->>DB: UPDATE employees SET ... WHERE id = :id
-    DB-->>API: updated record
-    API-->>LIFF: { success: true, data: employee }
-    LIFF-->>เสมียน: แสดง "แก้ไขสำเร็จ ✓" + ปิด LIFF
+    API->>DB: UPDATE employees
+    DB-->>LIFF: updated record
+    LIFF-->>เสมียน: toast "แก้ไขสำเร็จ" → navigate /employees/edit
 ```
 
-### 6.4 Intent Trigger Map
+---
 
-| User พิมพ์ / กดปุ่ม | Intent | Action |
-|----------------------|--------|--------|
-| `>พนักงาน` | EMPLOYEE_MENU | แสดง Flex Menu: รายชื่อ/สร้าง/แก้ไข/ลบ |
-| `>ลงเวลา` | ATTENDANCE_WEBVIEW | reply LIFF URL โดยตรง (ไม่ต้องเลือกพนักงานก่อน — ตารางอยู่ใน LIFF) |
-| `>งวด` | PERIOD_MENU | แสดง Flex: สร้างงวด / รายการงวด |
-| `>คำนวณ` | CALCULATE_MENU | แสดง Flex: เลือกงวดที่จะคำนวณ |
-| `>รายงาน` | REPORT_MENU | แสดง Flex: เลือกประเภทรายงาน |
-| Postback: `employee_list` | LIST_EMPLOYEES | ดึง list + reply text |
-| Postback: `employee_create` | CREATE_EMPLOYEE | ส่ง LIFF URL `/employees/new` (form สร้าง) |
-| Postback: `employee_edit` | EDIT_EMPLOYEE | ส่ง LIFF URL `/employees/edit` (หน้าเลือกพนักงาน) |
-| Postback: `attendance_log:{id}` | LOG_ATTENDANCE | ส่ง LIFF URL (form บันทึกเวลา) |
+## 6. Security
 
-> **หมายเหตุ:** ปุ่ม "แก้ไข" ใน Flex Message ต้องเป็น `uri` action (ไม่ใช่ `message`) ชี้ไปที่ `${liffBase}/employees/edit` เพื่อเปิด LIFF โดยตรง
+- **LINE Signature Verification:** ทุก request ที่ `/webhook/line` ต้อง verify `x-line-signature` ด้วย HMAC-SHA256 — ใน `signature.ts` (ยังไม่ wire เป็น middleware)
+- **Supabase Service Role:** Backend ใช้ `SUPABASE_SERVICE_ROLE_KEY` เท่านั้น
+- **Input Validation:** ใช้ Zod validate ทุก request body ก่อนถึง service layer
+- **Role Guard:** ยังไม่ implement — เพิ่มใน Phase 3
 
 ---
 
 ## 7. Key Decisions & Tradeoffs
 
-| Decision | Options Considered | Choice | Reason |
-|----------|--------------------|--------|--------|
-| DB | Firebase vs Supabase | Supabase | SQL > NoSQL สำหรับ payroll calculation, มี dashboard ดี |
-| Frontend | Next.js vs React+Vite | React+Vite | lightweight, deploy บน static hosting ได้, LIFF ไม่ต้องการ SSR |
-| ORM | Prisma vs Drizzle vs Supabase client | Supabase client โดยตรง | ลด dependency, Supabase JS client ครอบคลุมพอสำหรับ CRUD |
-| Webhook Auth | ไม่ verify vs verify signature | Verify ทุก request | Security — LINE docs บังคับ |
-| LINE Form | Chat-based form vs LIFF | LIFF สำหรับ complex form | Chat-based form ซับซ้อน / error-prone สำหรับ multi-field input |
-| Role management | LINE Group role vs DB | DB (line_users table) | ยืดหยุ่นกว่า, เปลี่ยน role ได้โดยไม่เปลี่ยน LINE config |
-| hours_worked | คำนวณใน app vs DB GENERATED | GENERATED ALWAYS (SQL) | ลด bug จาก manual calculation, เก็บแค่ check_in/out |
-
----
-
-## 8. Security Considerations
-
-- **LINE Signature Verification:** ทุก request ที่ `/webhook/line` ต้อง verify `x-line-signature` header ด้วย HMAC-SHA256 กับ `LINE_CHANNEL_SECRET` — ทำใน middleware ก่อนถึง handler
-- **Role Guard:** API endpoints ที่ต้องการ auth จะ extract LINE userId จาก LIFF token แล้ว query `line_users` table เพื่อตรวจ role
-- **Supabase Service Role:** Backend ใช้ `SUPABASE_SERVICE_ROLE_KEY` เท่านั้น (ไม่ expose anon key ฝั่ง backend)
-- **LIFF Init:** Frontend ต้อง `liff.init()` สำเร็จก่อนถึงจะ call API ได้ — ป้องกัน non-LINE access
-- **Input Validation:** ใช้ Zod validate ทุก request body ก่อนถึง service layer
-- **Timezone:** บันทึกเป็น UTC ใน DB, แปลงเป็น Asia/Bangkok เฉพาะตอน display
-
----
-
-## 9. Testing Plan
-
-- **Unit tests (ในอนาคต):** Payroll Engine — test calculation logic กับ dataset ที่รู้คำตอบแน่นอน
-- **Integration tests:** API endpoints หลัก (employee CRUD, attendance create/update, payroll calculate)
-- **Manual QA checklist ก่อน deploy:**
-  - [ ] สร้างพนักงานใหม่ผ่าน LIFF → ขึ้น list ใน LINE
-  - [ ] บันทึกเวลาทำงาน → ข้อมูลถูกต้องใน Supabase
-  - [ ] คำนวณเงินเดือน → ยอดตรงกับ manual Excel
-  - [ ] ล็อกงวด → ไม่สามารถแก้ attendance ในช่วงนั้นได้
-  - [ ] Admin เห็นแค่ read-only report (ไม่มีปุ่ม CRUD)
-
----
-
-## 10. Open Questions / Risks
-
-- [ ] OT threshold: เกิน 8 ชั่วโมง/วัน = OT หรือกำหนดต่างกันต่อพนักงาน?
-- [ ] งวดเงินเดือนทับกันได้ไหม? (ถ้าไม่ควร add unique constraint)
-- [ ] LINE LIFF URL routing: 1 LIFF app หลาย route หรือแยก LIFF หลาย app?
-- [ ] ถ้า LINE signature verify fail → return 200 หรือ 400? (LINE แนะนำ return 200 เสมอ)
-- [ ] Supabase Row Level Security (RLS): เปิด RLS ไหม? หรือใช้ service_role bypass ทั้งหมด?
+| Decision | เลือก | เหตุผล |
+|----------|-------|--------|
+| DB PK | `int generated always as identity` | ง่ายกว่า UUID, เพียงพอสำหรับ single org |
+| Employee wage | `wage` (รายวัน) เท่านั้น | ทีมนี้ทุกคนเป็นรายวัน — ไม่ต้องการ wage_type ใน v1 |
+| ot_rate | คำนวณใน app (`wage/8×1.5`) | ไม่ใช้ GENERATED column — ง่ายกว่า, update ได้ตาม wage |
+| Period status | `is_active boolean` | เรียบง่ายกว่า `status enum` สำหรับ open/locked ใน v1 |
+| missing-dates | คำนวณใน service layer | เอา range ทั้งหมด − logged dates = missing |
+| OT storage | `double precision` hours | เก็บ decimal (1.5 = 1h30m), UI แสดง 2 input ชม./น. |

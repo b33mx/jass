@@ -4,401 +4,191 @@
 
 ---
 
-## Phase 0 — Foundation
+## Phase 0 — Foundation ✅ Complete
 
-### [ ] DB Schema Migration
+### [x] DB Schema Migration
+- Migration `0002_rebuild_schema.sql` — employees, periods (is_active), attendance (unique constraint), tasks
+- Note: schema ต่างจาก TECH_SPEC v1.0 — ใช้ int PK, first_name/last_name, wage รายวันเท่านั้น, ไม่มี hours_worked GENERATED
 
-**File:** `supabase/migrations/0001_init_schema.sql`
+### [x] Supabase Client Setup
+- `apps/backend/src/lib/supabase.ts` — singleton ใช้ SUPABASE_SERVICE_ROLE_KEY
 
-- เขียน CREATE TABLE สำหรับ: `employees`, `attendance`, `work_logs`, `payroll_periods`, `payroll_results`, `line_users`
-- `attendance.hours_worked` ต้องเป็น `GENERATED ALWAYS AS (...) STORED`
-- ทุก table มี `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`
-- Constraint: `attendance(employee_id, work_date)` → UNIQUE
-- Constraint: `payroll_results(period_id, employee_id)` → UNIQUE
-- Constraint: `payroll_periods.status` CHECK `IN ('open', 'locked')`
-- Constraint: `employees.wage_type` CHECK `IN ('daily', 'monthly')`
-- Constraint: `line_users.role` CHECK `IN ('clerk', 'admin')`
-- Acceptance: run migration ใน Supabase → ไม่มี error, table ขึ้นใน dashboard
+### [x] LINE Signature Verification
+- `apps/backend/src/services/line/signature.ts` — logic มีแล้ว
+- ⚠️ ยังไม่ wire เป็น middleware ใน `line-webhook.route.ts`
 
-### [ ] Supabase Client Setup (Backend)
-
-**File:** `apps/backend/src/lib/supabase.ts`
-
-- Export singleton `supabaseAdmin` ใช้ `SUPABASE_SERVICE_ROLE_KEY`
-- Import จาก `@supabase/supabase-js`
-- ติดตั้ง package: `npm install @supabase/supabase-js --workspace apps/backend`
-- ไม่ใช้ anon key ฝั่ง backend
-- Acceptance: import ใน route แล้ว `supabaseAdmin.from('employees').select('*')` ได้ข้อมูล
-
-### [ ] LINE Signature Verification Middleware (Wire ให้เสร็จ)
-
-**File:** `apps/backend/src/middleware/verifyLineSignature.ts`
-
-- ใช้ logic ที่มีใน `signature.ts` มา wrap เป็น Express middleware
-- ถ้า signature ไม่ valid → return HTTP 200 (ตาม LINE spec) พร้อม log warning
-- ถ้า valid → `next()`
-- Wire เข้าใน `line-webhook.route.ts` ก่อน handler
-- Acceptance: ส่ง request ที่ signature ผิด → log "invalid signature" แต่ return 200
-
-### [ ] LIFF Init Setup (Frontend)
-
-**File:** `apps/web/src/lib/liff.ts`
-
-- ติดตั้ง: `@line/liff` มีใน dependencies แล้ว
-- Export `initLiff()` function: `liff.init({ liffId: import.meta.env.VITE_LIFF_ID })`
-- Export `getLiffUserId()`: return `liff.getProfile().userId` หลัง init
-- Call `initLiff()` ใน `main.tsx` หรือ top-level component
-- Acceptance: เปิดผ่าน LINE → `liff.isLoggedIn()` = true, ได้ userId
-
-### [ ] Seed Data
-
-**File:** `supabase/seed/seed.sql`
-
-- INSERT 1 `line_users` role='clerk' (ใส่ LINE userId จริงของ dev เพื่อ test)
-- INSERT 1 `line_users` role='admin'
-- INSERT 2–3 `employees` ตัวอย่าง (wage_type: daily + monthly)
-- Acceptance: run seed → Supabase มีข้อมูล seed ให้ test ได้ทันที
+### [x] LIFF Scaffold
+- Frontend React + Vite + Tailwind + AppLayout + routing
 
 ---
 
 ## Phase 1 — Employee + Attendance MVP
 
-### [ ] Employee Repository
+### Employee Feature ✅ Complete
 
-**File:** `apps/backend/src/repositories/employee.repository.ts`
+#### [x] Employee Repository
+- `apps/backend/src/modules/employees/employee.repository.ts`
+- Functions: `selectAll`, `selectById`, `insert`, `updateById`, `softDeleteById`
 
-- `getAll()` → employees ที่ `is_active = true`
-- `getById(id)` → employee 1 record หรือ null
-- `create(data)` → INSERT + return created record
-- `update(id, data)` → UPDATE + return updated record
-- `deactivate(id)` → SET `is_active = false, updated_at = now()`
-- Acceptance: unit-testable (รับ supabase client เป็น parameter หรือ mock ได้)
+#### [x] Employee Service
+- `apps/backend/src/modules/employees/employee.service.ts`
+- `createEmployee` คำนวณ `ot_rate = wage/8×1.5` อัตโนมัติ
 
-### [ ] Employee Service
+#### [x] Employee Controller + Routes
+- `GET /api/employees` — รายชื่อ active
+- `POST /api/employees` — สร้าง
+- `GET /api/employees/:id` — ดูรายคน
+- `PATCH /api/employees/:id` — แก้ไข
+- `DELETE /api/employees/:id` — soft delete
 
-**File:** `apps/backend/src/services/employee.service.ts`
+#### [x] Employee LINE Handler
+- trigger `>พนักงาน` → Flex menu (รายชื่อ / สร้าง / แก้ไข/ลบ)
+- trigger `>รายชื่อ` → text list
 
-- `listEmployees()` → call repository.getAll()
-- `createEmployee(data)` → validate ด้วย Zod schema + call repository.create()
-  - Required: name (string, min 1), wage_type, rate ≥ 0
-- `updateEmployee(id, data)` → validate + call repository.update()
-- `deactivateEmployee(id)` → check exists ก่อน → call repository.deactivate()
-- Acceptance: throw readable Error ถ้า validation fail
-
-### [ ] Employee API Routes
-
-**File:** `apps/backend/src/routes/employee.route.ts`
-
-- `GET /api/employees` → listEmployees()
-- `POST /api/employees` → createEmployee(req.body)
-- `PATCH /api/employees/:id` → updateEmployee(id, req.body)
-- `DELETE /api/employees/:id` → deactivateEmployee(id)
-- Wire ใน `routes/index.ts`
-- Response format: `{ success: true, data: ... }` หรือ `{ success: false, error: string }`
-- Acceptance: test ด้วย curl/Postman → CRUD ทำงานได้
-
-### [ ] Employee LINE Handler Update
-
-**File:** `apps/backend/src/services/line/handlers/message.handler.ts`
-
-- เพิ่ม trigger: `>พนักงาน` → reply Flex menu (มีอยู่แล้ว)
-- Handle postback `employee_list` → call listEmployees() → reply text list
-- Handle postback `employee_create` → reply message พร้อม LIFF URL: `/employees/create`
-- Handle postback `employee_edit:{id}` → reply LIFF URL: `/employees/{id}/edit`
-- Handle postback `employee_delete:{id}` → confirm → deactivate → reply success
-- Acceptance: กดปุ่มทุกปุ่มใน Flex menu → ได้ response ถูกต้อง
-
-### [ ] Employee LIFF Pages — สร้างพนักงาน
-
-**File:** `apps/web/src/pages/employees/AddEmployeePage.tsx`
-
+#### [x] LIFF: AddEmployeePage
 - Route: `/employees/new`
-- Form: ชื่อ, นามสกุล, ค่าแรง
-  - OT rate คำนวณอัตโนมัติ: ค่าแรง ÷ 8 × 1.5 (แสดงแบบ read-only)
-- Submit → `POST /api/employees`
-- Success → navigate ไป `/employees/new/success`
-- Validation: client-side required + number min=0
-- Acceptance: กรอก form → submit → ข้อมูลขึ้นใน Supabase
+- Form: ชื่อ, นามสกุล, ค่าแรง + OT rate card (read-only)
+- Success → `/employees/new/success`
 
----
-
-### [ ] Employee Flex Button — เปลี่ยนปุ่ม "แก้ไข" เป็น URI Action
-
-**File:** `apps/backend/src/services/line/messages/employee-menu.ts`
-
-- เปลี่ยน action ของปุ่ม "แก้ไข" จาก `type: 'message'` เป็น `type: 'uri'`
-- URI ชี้ไปที่ `${liffBase}/employees/edit`
-- Acceptance: กดปุ่ม "แก้ไข" ใน LINE → เปิด LIFF `/employees/edit` ทันที (ไม่ส่งข้อความ)
-
----
-
-### [ ] Employee LIFF Pages — หน้าเลือกพนักงานที่จะแก้ไข
-
-**File:** `apps/web/src/pages/employees/EditEmployeeSelectPage.tsx`
-
+#### [x] LIFF: EditEmployeeSelectPage
 - Route: `/employees/edit`
-- `GET /api/employees` → render card list รายชื่อพนักงาน active ทั้งหมด
-- Layout ของแต่ละ card:
-  ```
-  ┌─────────────────────────────┐
-  │  [icon]  ชื่อ นามสกุล       │
-  │          ค่าแรง X บาท/วัน  >│
-  └─────────────────────────────┘
-  ```
-- กด card → navigate ไป `/employees/:id/edit`
-- ถ้าไม่มีพนักงาน → แสดง empty state "ยังไม่มีพนักงานในระบบ"
-- Loading state ขณะ fetch
-- Acceptance: แสดงรายชื่อพนักงาน active ทุกคน, กดแล้วไปหน้าแก้ไขถูกต้อง
+- card list พนักงาน active → navigate `/employees/:id/edit`
 
----
-
-### [ ] Employee LIFF Pages — ฟอร์มแก้ไขพนักงาน + Modal Confirm
-
-**File:** `apps/web/src/pages/employees/EditEmployeePage.tsx`
-
+#### [x] LIFF: EditEmployeePage
 - Route: `/employees/:id/edit`
-- `GET /api/employees/:id` → ดึงข้อมูล employee มา pre-fill ฟอร์ม
-- **ดีไซน์เหมือน AddEmployeePage:** header แดง (brandRed), body ขาว, rounded-3xl, shadow
-  - Header แสดง: ชื่อพนักงาน + label "แก้ไขข้อมูล"
-  - Body: ฟอร์ม ชื่อ / นามสกุล / ค่าแรง (pre-filled จาก API)
-  - OT rate card (คำนวณ real-time เหมือน AddEmployeePage)
-- กดปุ่ม **"ยืนยันการแก้ไข"** → เปิด Modal Confirm (ไม่ submit ทันที)
-
-**Modal Confirm:**
-```
-┌──────────────────────────────────┐
-│  ยืนยันการแก้ไขข้อมูลพนักงาน    │
-│                                  │
-│  [ชื่อ นามสกุล]                  │
-│  ค่าแรงใหม่: X บาท/วัน           │
-│                                  │
-│  [ ยกเลิก ]    [ ยืนยัน ]        │
-└──────────────────────────────────┘
-```
-- กด **"ยืนยัน"** ใน modal → `PATCH /api/employees/:id` → ปิด modal → แสดง toast success → navigate ไป `/employees/edit`
-- กด **"ยกเลิก"** ใน modal → ปิด modal กลับไปหน้าฟอร์ม (ไม่แก้ข้อมูล)
-- Validation: ต้องมีชื่อ + นามสกุล + ค่าแรง > 0 ก่อนเปิด modal
-- Loading state ขณะ PATCH (ปิดปุ่มยืนยันไม่ให้กดซ้ำ)
-- Acceptance: แก้ไขข้อมูล → ยืนยันใน modal → ข้อมูลใน Supabase อัปเดตถูกต้อง
-
-### [ ] Attendance Repository
-
-**File:** `apps/backend/src/repositories/attendance.repository.ts`
-
-- `upsert(data: { employeeId, workDate, shiftMorning, shiftAfternoon, otHours })` → INSERT ... ON CONFLICT (employee_id, work_date) DO UPDATE
-- `upsertMany(entries[])` → loop upsert (Supabase JS ไม่มี native batch upsert สำหรับ conflict)
-- `getByEmployee(employeeId, startDate, endDate)` → attendance ในช่วง
-- `getByPeriod(startDate, endDate)` → attendance ทุกคนในช่วง (ใช้สำหรับ payroll)
-- Acceptance: upsert record เดิม → update แทน insert ใหม่, hours_worked คำนวณอัตโนมัติจาก DB
-
-### [ ] Attendance Service
-
-**File:** `apps/backend/src/services/attendance.service.ts`
-
-- `batchLogAttendance({ workDate, entries[] })` → validate per entry:
-  - shiftMorning หรือ shiftAfternoon ต้องเป็น true อย่างน้อย 1 อย่าง
-  - ot_hours ≥ 0
-  - workDate ต้องไม่อยู่ในงวดที่ status = 'locked'
-  - call repository.upsert() ต่อ entry (หรือ bulk upsert)
-- `batchLogWorkLogs({ workDate, tasks[] })` → validate per task:
-  - description ไม่ว่าง
-  - responsibleEmployeeIds มีอย่างน้อย 1 id
-  - call repository.insertMany()
-- Acceptance: บันทึก attendance ซ้ำ same employee + same date → update (ไม่ duplicate)
-
-### [ ] Attendance API Route
-
-**File:** `apps/backend/src/routes/attendance.route.ts`
-
-- `POST /api/attendance` → logAttendance(req.body)
-- `GET /api/attendance?employeeId=&startDate=&endDate=` → getByEmployee()
-- Wire ใน `routes/index.ts`
-- Acceptance: POST บันทึกเวลา → GET เห็นข้อมูล
-
-### [ ] Attendance API — Batch Routes
-
-**File:** `apps/backend/src/routes/attendance.route.ts`
-
-เพิ่ม batch endpoints:
-
-- `POST /api/attendance/batch` → รับ `{ workDate, entries: [{ employeeId, shiftMorning, shiftAfternoon, otHours }] }`
-  - UPSERT ทีละแถวใน loop (conflict: employee_id + work_date)
-  - Validate: ot_hours ≥ 0, workDate ต้องไม่อยู่ในงวดที่ locked
-- `POST /api/work-logs/batch` → รับ `{ workDate, tasks: [{ description, responsibleEmployeeIds }] }`
-  - INSERT work_logs หลายแถวพร้อมกัน
-  - Validate: description ไม่ว่าง, responsibleEmployeeIds ไม่ว่าง array
-- Acceptance: POST 1 request → หลายแถวใน DB
+- pre-filled form + modal confirm แก้ไข + modal confirm ลบ
 
 ---
 
-### [ ] Attendance LIFF Page — Step 1: ตารางลงเวลา
+### Period Feature ✅ Complete
 
-**File:** `apps/web/src/pages/attendance/log.tsx`
+#### [x] Period Repository
+- `apps/backend/src/modules/periods/period.repository.ts`
+- `selectActivePeriod(today)` — หางวดที่ `is_active=true AND today BETWEEN start..end`
+- `insertPeriod(data)` — สร้างงวดใหม่
+- `selectPeriodById(id)`
 
-**Layout:**
-```
-วันที่: [date picker — default วันนี้]
+#### [x] Period Service + Controller + Routes
+- `GET /api/periods` → Period[] (ทั้งหมด เรียงล่าสุดก่อน)
+- `GET /api/periods/active` → `{ period: Period | null }`
+- `POST /api/periods` → Period (validate start_date ≤ end_date)
 
-┌─────────────┬──────┬──────┬─────────┐
-│ ชื่อพนักงาน  │ เช้า │ บ่าย │ OT (ชม) │
-├─────────────┼──────┼──────┼─────────┤
-│ สมชาย       │  ☐  │  ☐  │ [  0  ] │
-│ สมหญิง      │  ☐  │  ☐  │ [  0  ] │
-└─────────────┴──────┴──────┴─────────┘
+#### [x] Attendance LINE Handler
+- trigger `>ลงเวลา` → Flex message + ปุ่มเปิด LIFF `/attendance`
 
-[ถัดไป →] ← disabled ถ้าไม่มีใคร tick
-```
+#### [x] LIFF: AttendanceOverviewPage
+- Route: `/attendance` (หน้าหลักลงเวลา)
+- Load `GET /api/periods` → แสดง period selector ถ้ามีหลายงวด
+- ถ้าไม่มีงวดเลย → empty state + ปุ่ม "สร้างงวดใหม่"
+- แสดงรายการวันทั้งหมดในงวดพร้อมสถานะ:
+  - ✅ ลงเวลาแล้ว (date ไม่อยู่ใน missing-dates)
+  - ⏰ ยังไม่ลงเวลา (date อยู่ใน missing-dates และ ≤ today)
+  - ○ ยังไม่ถึงวัน (date > today, disabled)
+- กดวันที่ → navigate `/attendance/log` พร้อม state `{ period, date }`
 
-**Logic:**
-- `GET /api/employees` → render แถวตาม employees active
-- State: `{ [employeeId]: { shiftMorning, shiftAfternoon, otHours } }`
-- ปุ่ม "ถัดไป" disabled เมื่อไม่มี employee ที่ tick เช้า หรือ บ่าย เลยสักคน
-- กด "ถัดไป" → เก็บ attendance state แล้วเปลี่ยนไป Step 2 (ไม่ submit ยัง)
-- Acceptance: tick/untick + ใส่ OT → state update ถูกต้อง, ปุ่ม disabled logic ทำงาน
+#### [x] LIFF: AttendancePage (Log Form)
+- Route: `/attendance/log`
+- รับ state `{ period?, date? }` จาก overview
+  - ถ้ามี state.period → ใช้ period นั้น (ไม่ต้อง fetch active)
+  - ถ้ามี state.date → pre-select วันนั้นทันที (รองรับทั้ง logged และ missing)
+  - ถ้าไม่มี state → fetch active period, auto-select วันนี้
+- ตาราง: ชื่อ | checkbox เช้า | checkbox บ่าย | input OT (ชม. + น.)
+- Submit: `POST /api/attendance/batch` → navigate `/tasks/new`
 
----
-
-### [ ] Attendance LIFF Page — Step 2: รายการงาน
-
-**File:** `apps/web/src/pages/attendance/log.tsx` (ต่อจาก Step 1 — ใช้ state เดียวกัน)
-
-**Layout:**
-```
-รายการงานวันที่ [วันที่]
-
-┌──────────────────────────────────────┐
-│ รายการที่ 1                           │
-│ รายละเอียด: [textarea]               │
-│ ผู้รับผิดชอบ: [multi-select dropdown] │
-│                          [ลบ ✕]      │
-└──────────────────────────────────────┘
-
-[+ เพิ่มรายการงาน]
-
-[← ย้อนกลับ]  [บันทึกทั้งหมด ✓]
-```
-
-**Multi-select Dropdown:**
-- แสดงรายชื่อพนักงาน active ทั้งหมด (ใช้ list เดิมที่ fetch มาแล้วใน Step 1)
-- เลือกได้หลายคน แสดง badge ชื่อที่เลือกไว้
-- ไม่ต้อง library ภายนอก — ทำเป็น custom dropdown ด้วย Tailwind + useState
-
-**Submit Logic:**
-- กด "บันทึกทั้งหมด":
-  1. `POST /api/attendance/batch` ส่ง attendance entries ที่ tick
-  2. `POST /api/work-logs/batch` ส่ง tasks ทั้งหมด
-  3. รอทั้งคู่ด้วย `Promise.all`
-  4. สำเร็จ → แสดง success state + ปุ่ม "ปิด" (liff.closeWindow())
-- Loading state ระหว่าง submit (ปิดปุ่มไม่ให้กดซ้ำ)
-
-**Validation ก่อน submit:**
-- มีรายการงานอย่างน้อย 1 รายการ (warn ถ้าไม่มี แต่ไม่ block — เสมียนอาจลงเวลาอย่างเดียว)
-- ทุก task ต้องมี description และ responsible อย่างน้อย 1 คน
-
-- Acceptance: กรอก 3 tasks → submit → work_logs table มี 3 แถว, attendance มีแถวตาม tick
+#### [x] LIFF: CreatePeriodPage
+- Route: `/periods/new`
+- Mount check: ถ้ามี active period → redirect `/attendance`
+- Form: start_date, end_date
+- Submit → `POST /api/periods` → redirect `/attendance`
 
 ---
 
-## Phase 2 — Payroll Core
+### Attendance Feature ✅ Complete
 
-### [ ] Payroll Period Repository + Service + Routes
+#### [x] Attendance Repository
+- `apps/backend/src/modules/attendance/attendance.repository.ts`
+- `selectLoggedDatesByPeriod(periodId)` — distinct dates ที่มีบันทึกแล้ว
+- `selectAttendanceByPeriodAndDate(periodId, date)`
+- `upsertAttendanceBatch(records[])` — ON CONFLICT (date, employee, period)
 
-**Files:** `apps/backend/src/repositories/payroll.repository.ts`, `services/payroll.service.ts`, `routes/payroll.route.ts`
+#### [x] Attendance Service
+- `getMissingDates(periodId)` — allDates − loggedDates
+- `getAttendanceForDate(periodId, date)`
+- `saveAttendanceBatch(dto)`
 
-- `POST /api/payroll-periods` → สร้างงวด { start_date, end_date }
-  - Validate: start_date < end_date
-- `GET /api/payroll-periods` → รายการงวดทั้งหมด
-- `PATCH /api/payroll-periods/:id/lock` → SET status = 'locked', locked_at = now()
-  - ต้อง calculate ก่อน lock (มี payroll_results อยู่แล้ว)
-- Acceptance: สร้าง, ดู, lock งวดได้
+#### [x] Attendance Controller + Routes
+- `GET /api/attendance/missing-dates?period_id=X`
+- `GET /api/attendance?period_id=X&date=Y`
+- `POST /api/attendance/batch`
+
+---
+
+### Tasks Feature ✅ Complete
+
+#### [x] Tasks Repository + Service + Routes
+- `POST /api/tasks` — รับ `{ tasks: [...] }` batch insert
+- `employee_ids` เก็บเป็น comma-separated string (e.g. `"1,3,5"`)
+- หลัง save → fire-and-forget `sendDailySummary` (LINE broadcast)
+
+#### [x] LIFF: CreateTasksPage
+- Route: `/tasks/new`
+- รับ state `{ date, employees, period, remainingCount }` จาก AttendancePage
+- แสดงรายการงาน (เพิ่มได้เรื่อยๆ): ชื่องาน*, ดีเทล, พนักงาน (multi-select dropdown)
+- Submit → `POST /api/tasks` → success view
+  - ยังเหลือวัน → "บันทึกสำเร็จ | เหลืออีก X วัน" + ปุ่ม "ลงเวลาวันถัดไป" → `/attendance`
+  - ครบทุกวัน → "ลงเวลาครบทุกวันแล้ว!" + ปุ่ม "กลับหน้าหลัก" → `/`
+
+#### [x] LINE: Daily Summary Broadcast
+- `sendDailySummary(date, tasks)` — ส่ง broadcast หลัง save tasks
+- ข้อความ: สรุปการทำงานวันที่, มาทำงาน/ขาด, รายการงาน + ผู้รับผิดชอบ
+
+---
+
+## Phase 2 — Payroll Core 🔲 Not started
+
+### [ ] Period Management (เพิ่มเติม)
+- `PATCH /api/periods/:id` — close งวด (set is_active = false)
+- LINE handler: `>งวด` → Flex menu
 
 ### [ ] Payroll Calculation Engine
-
-**File:** `apps/backend/src/services/payroll/calculator.ts`
-
-```typescript
-// Signature ที่ต้องการ
-function calculatePayroll(
-  employees: Employee[],
-  attendance: Attendance[],
-  period: PayrollPeriod
-): PayrollResult[]
-```
-
-- Loop ทุก employee
-- filter attendance ของ employee ในช่วง start_date → end_date
-- นับ working_days, total_hours, ot_hours
-- คำนวณ gross:
-  - `daily`: working_days × rate_daily + ot_hours × rate_ot_per_hour
-  - `monthly`: rate_monthly + ot_hours × rate_ot_per_hour
-- บันทึก calculation_detail เป็น JSON (breakdown รายวัน)
-- Pure function — ไม่ access DB โดยตรง (testable)
-- Acceptance: ทดสอบด้วย mock data → ยอดตรงกับ manual calculation
+- Pure function: `calculatePayroll(employees[], attendance[], period) → PayrollResult[]`
+- gross = วันทำงาน × wage + sum(ot) × ot_rate
+- "วันทำงาน" = แถวที่ `morning_check OR afternoon_check = true`
 
 ### [ ] Calculate Endpoint + LINE Handler
-
-**Route:** `POST /api/payroll-periods/:id/calculate`
-
-- GET period + GET attendance ในช่วง + GET active employees
-- เรียก calculatePayroll()
-- UPSERT payroll_results (conflict: period_id + employee_id)
-- Return summary
-- LINE handler: `>คำนวณ` → เลือกงวด → call endpoint → reply Flex สรุปยอด
-- Acceptance: LINE reply แสดงยอดรายคน + รวม
+- `POST /api/periods/:id/calculate` — คำนวณและ cache ผล
+- `GET /api/periods/:id/results` — ดูผลคำนวณ
+- LINE handler: `>คำนวณ` → เลือกงวด → reply Flex สรุปยอด
 
 ---
 
-## Phase 3 — Polish & Report
+## Phase 3 — Polish & Report 🔲 Planned
 
-### [ ] Work Log Service + Route
+### [ ] LINE Signature Middleware
+- Wire `signature.ts` เป็น Express middleware ใน `line-webhook.route.ts`
 
-- `POST /api/work-logs` → บันทึกรายละเอียดงาน (employee_id, work_date, description)
-- `GET /api/work-logs?employeeId=&startDate=&endDate=` → ดูรายการ
-- Acceptance: บันทึกหลาย log ต่อวันได้ (ไม่ต้อง unique)
+### [ ] LINE Auth (line_users table)
+- Migration: สร้าง `line_users` table (line_user_id, role)
+- Middleware: extract userId จาก LIFF token → query role
+- Guard: endpoint ที่ต้องการ clerk role
 
-### [ ] Report: ดูสรุปเวลางานรายงวด
+### [ ] Report: สรุปเวลางาน + เงินเดือน
+- `GET /api/periods/:id/report` — สรุปรายคน
+- LINE handler: `>รายงาน` → Flex แสดงยอดรายคน
 
-- LINE handler: `>รายงาน` → เมนูประเภทรายงาน
-- ประเภท 1: สรุปเวลา → แสดง check_in/out + OT รายคน
-- ประเภท 2: สรุปเงินเดือน → แสดงยอดสุทธิรายคน
-- Admin ดูได้ทุกรายงาน (read-only ไม่มีปุ่ม action)
-- Acceptance: Admin LINE ดูรายงานได้ แต่ไม่เห็นปุ่ม CRUD
-
-### [ ] Error Handling + UX Polish
-
-- Reply message เป็นภาษาไทยที่เข้าใจง่ายเมื่อเกิด error
-- ถ้าพิมพ์คำสั่งที่ไม่รู้จัก → reply help message แสดงคำสั่งทั้งหมด
-- LIFF: loading state ขณะ submit form
-- Acceptance: error ทุกกรณีมี user-friendly message
+### [ ] Error UX Polish
+- Reply ภาษาไทยที่เข้าใจง่ายเมื่อ error
+- ถ้าพิมพ์คำสั่งไม่รู้จัก → reply help message
 
 ---
 
-## Phase 4 — Deploy & UAT
+## Phase 4 — Deploy & UAT 🔲 Planned
 
 ### [ ] Deploy Backend (Railway)
-
-- สร้าง Railway project + set environment variables
-- `railway up` หรือ connect GitHub repo
-- Test `/health` endpoint บน production URL
-- Acceptance: `GET https://api.jass.xxx/health` → `{ status: "ok" }`
-
 ### [ ] Deploy Frontend (Vercel)
-
-- สร้าง Vercel project + set `VITE_LIFF_ID`, `VITE_API_BASE_URL`
-- Build + deploy
-- Acceptance: LIFF URL เปิดใน LINE ได้
-
 ### [ ] LINE OA Production Config
-
-- ตั้ง Webhook URL production ใน LINE Developers Console
-- ตั้ง LIFF Endpoint URL ชี้ไปที่ Vercel URL
-- Acceptance: ส่งข้อความใน LINE OA production → ได้ reply
-
 ### [ ] UAT Checklist
-
-- [ ] เสมียน: เพิ่มพนักงาน → ขึ้น list
-- [ ] เสมียน: บันทึกเวลาทำงาน → ข้อมูลถูกต้อง
-- [ ] เสมียน: สร้างงวด → calculate → ยอดตรงกับ Excel ที่เคยทำ
-- [ ] เสมียน: lock งวด → ไม่สามารถแก้ attendance ในช่วงนั้น
-- [ ] Admin: ดูรายงานเวลา → ไม่เห็นปุ่ม CRUD
-- [ ] Admin: ดูยอดเงินเดือน → ยอดถูกต้อง
+- [ ] เพิ่มพนักงาน → ขึ้น list
+- [ ] ลงเวลา → ข้อมูลถูกต้องใน Supabase
+- [ ] สร้างงวด → calculate → ยอดตรงกับ Excel
+- [ ] ปิดงวด → ไม่สามารถแก้ attendance ในช่วงนั้น (ถ้า implement lock guard)

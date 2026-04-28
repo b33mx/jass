@@ -1,6 +1,6 @@
 # JASS Payroll LINE OA — Project Context
 
-> Last updated: 2026-04-27 | Phase: Phase 0 — Foundation
+> Last updated: 2026-04-28 | Phase: Phase 1 — Employee + Attendance MVP (in progress)
 
 ## What we're building
 
@@ -21,53 +21,77 @@
 
 - TypeScript strict mode ทั้งสอง app
 - Backend เป็น ESM (`"type": "module"`) — import ต้องมี `.ts` extension
-- API response format: `{ success: true, data: ... }` หรือ `{ success: false, error: string, code?: string }`
-- DB access ผ่าน repository layer เท่านั้น — ไม่ query Supabase ตรงจาก route/controller
+- API response format: direct data (ไม่ wrap `{ success, data }`) ตามที่ implement จริง
+- DB access ผ่าน repository layer เท่านั้น — ไม่ query Supabase ตรงจาก controller
 - Service layer = pure business logic ไม่รู้จัก HTTP/LINE
+- Controller layer = รู้จัก HTTP req/res, เรียก service, return JSON
 - Handler layer = รู้จัก LINE event, เรียก service, build Flex message
 - Timezone: บันทึก UTC ใน DB, แสดงผล Asia/Bangkok (UTC+7)
-- Zod สำหรับ validate ทุก input (API body + LINE event payload)
+- Zod สำหรับ validate ทุก input (API body)
 
 ## Decisions Made (ไม่ต้องถามซ้ำ)
 
 - ใช้ Supabase client โดยตรง — ไม่ใช้ Prisma/Drizzle
 - LIFF สำหรับ form input ที่ซับซ้อน — ไม่ทำ chat-based multi-step form
-- Role management อยู่ใน `line_users` table — ไม่ hardcode LINE userId ใน code
-- `hours_worked` เป็น GENERATED ALWAYS column ใน SQL — ไม่คำนวณใน app
+- PK ใช้ `int generated always as identity` — ไม่ใช้ UUID (ลด complexity)
+- Employee schema ใช้ `first_name`/`last_name` + `wage` (รายวัน) + `ot_rate` (คำนวณอัตโนมัติ = wage/8×1.5)
+- Attendance ใช้ `morning_check`/`afternoon_check` boolean + `ot` double precision (ชั่วโมง decimal)
+- ไม่มี `hours_worked` GENERATED column — คำนวณใน application layer เมื่อต้องการ
+- Period ใช้ `is_active boolean` ไม่ใช้ `status enum` — เปิด/ปิดงวดด้วย flag เดียว
+- "Active period" หมายถึง `is_active = true AND today BETWEEN start_date AND end_date`
+- tasks table ใช้ `employee_ids text` (comma-separated) — ใช้แทน work_logs ในการบันทึกงาน
+- Role management (`line_users` table) ยังไม่ implement ใน v1 (เพิ่มใน Phase 3)
 - ไม่ทำ multi-tenant ใน v1
 - ไม่ทำ PDF export ใน v1
-- Attendance UI = 2-step webview: Step 1 ตารางพนักงาน (เช้า/บ่าย checkbox + OT input), Step 2 รายการงาน (description + multi-select ผู้รับผิดชอบ)
-- attendance table ใช้ `shift_morning` / `shift_afternoon` boolean ไม่ใช่ check_in/check_out time
-- work_logs ใช้ `responsible_employee_ids uuid[]` — 1 task มีผู้รับผิดชอบหลายคน
 
 ## Current Phase
 
-**Phase 0 — Foundation** (กำลังเริ่ม)
+**Phase 1 — Employee + Attendance MVP** (in progress)
 
-สิ่งที่ต้องทำใน Phase 0:
-- [ ] เขียน DB migration (`0001_init_schema.sql`) ตาม schema ใน TECH_SPEC.md
-- [ ] เขียน seed data (`seed.sql`) สำหรับ local dev
-- [ ] Setup Supabase client ใน backend (singleton, ใช้ service_role)
-- [ ] Implement LINE signature verification middleware
-- [ ] Setup LIFF SDK ใน frontend + routing
+## What's done ✅
 
-## What's done
-
+### Infrastructure
 - [x] Monorepo scaffold (npm workspaces)
 - [x] Backend: Express app + helmet + cors + morgan
 - [x] Backend: `/health` route + `/webhook/line` route
-- [x] Backend: LINE signature verification (file มีแล้ว: `signature.ts`)
-- [x] Backend: Employee Flex Menu message builder
-- [x] Backend: Basic message handler (trigger: `>พนักงาน`)
-- [x] Frontend: React + Vite + Tailwind scaffold
-- [x] Frontend: AppLayout + HomePage placeholder
-- [x] CI: GitHub Actions lint + build
-- [x] `.env.example` สำหรับทั้ง 2 app
+- [x] Backend: LINE signature verification (`signature.ts`)
+- [x] Backend: Supabase client singleton (`lib/supabase.ts`)
+- [x] Frontend: React + Vite + Tailwind scaffold + AppLayout
 
-## What's next (Phase 0)
+### Database
+- [x] Migration `0002_rebuild_schema.sql` — employees, periods (is_active), attendance (unique constraint), tasks
 
-- [ ] DB Schema migration file
-- [ ] Supabase client setup ใน backend
-- [ ] LINE auth middleware (role check จาก line_users)
-- [ ] LIFF init setup ใน frontend
-- [ ] Employee repository + service + routes (เตรียมสำหรับ Phase 1)
+### Employee Feature
+- [x] Employee repository (select, insert, update, softDelete)
+- [x] Employee service (CRUD + calcOtRate)
+- [x] Employee controller + routes (`/api/employees`)
+- [x] LINE handler: `>พนักงาน` → Flex menu, `>รายชื่อ` → text list
+- [x] LIFF: AddEmployeePage (`/employees/new`)
+- [x] LIFF: AddEmployeeSuccessPage (`/employees/new/success`)
+- [x] LIFF: EditEmployeeSelectPage (`/employees/edit`)
+- [x] LIFF: EditEmployeePage (`/employees/:id/edit`) + delete
+
+### Attendance / Period Feature
+- [x] Period repository (selectActive, insert, selectById)
+- [x] Period service + controller + routes (`/api/periods/active`, `POST /api/periods`)
+- [x] Attendance repository (missingDates, byPeriodAndDate, upsertBatch)
+- [x] Attendance service + controller + routes (`/api/attendance/missing-dates`, `GET /api/attendance`, `POST /api/attendance/batch`)
+- [x] LINE handler: `>ลงเวลา` → Flex message พร้อม LIFF URL
+- [x] LIFF: AttendancePage (`/attendance`) — period check, dropdown วันที่ขาด, table + submit
+- [x] LIFF: CreatePeriodPage (`/periods/new`) — form สร้างงวด
+
+## What's next
+
+### Phase 1 — เหลือ
+- [ ] Tasks feature: บันทึกรายการงานรายวัน (ยังไม่มี API หรือ LIFF)
+
+### Phase 2 — Payroll Core
+- [ ] Payroll calculation engine (gross = วันทำงาน × wage + OT × ot_rate)
+- [ ] Calculate endpoint + LINE handler `>คำนวณ`
+- [ ] Period lock (is_active = false เมื่อสรุปเสร็จ)
+
+### Phase 3 — Polish & Report
+- [ ] Report: สรุปเวลา/เงินเดือนรายงวด
+- [ ] LINE handler `>รายงาน`
+- [ ] LINE auth (line_users table + role guard)
+- [ ] Error handling UX polish
