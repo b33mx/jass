@@ -1,6 +1,6 @@
-import { insertTasks } from './task.repository.ts';
-import { sendDailySummary } from '../../services/line/messages/daily-summary.ts';
-import type { Task, CreateTaskDto } from './task.types.ts';
+import { insertTasks } from './task.repository.js';
+import { sendDailySummary } from '../../services/line/messages/daily-summary.js';
+import type { Task, CreateTaskDto } from './task.types.js';
 
 export async function createTasks(dtos: CreateTaskDto[]): Promise<Task[]> {
   const tasks = await insertTasks(

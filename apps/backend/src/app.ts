@@ -2,7 +2,7 @@ import cors from 'cors';
 import express, { type Request } from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { registerRoutes } from './routes/index.ts';
+import { registerRoutes } from './routes/index.js';
 
 type RequestWithRawBody = Request & {
   rawBody?: Buffer;

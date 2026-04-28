@@ -3,7 +3,7 @@ import {
   handleGetAttendance,
   handleGetMissingDates,
   handleSaveAttendanceBatch,
-} from './attendance.controller.ts';
+} from './attendance.controller.js';
 
 export const attendanceRouter = Router();
 

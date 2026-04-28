@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { getAttendanceForDate, getMissingDates, saveAttendanceBatch } from './attendance.service.ts';
+import { getAttendanceForDate, getMissingDates, saveAttendanceBatch } from './attendance.service.js';
 
 const batchSchema = z.object({
   period_id: z.number().int().positive(),

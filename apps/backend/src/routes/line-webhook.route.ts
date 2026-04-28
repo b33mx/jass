@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { handleLineEvent } from '../services/line/handlers/message.handler.ts';
-import { isLineSignatureValid } from '../services/line/signature.ts';
+import { handleLineEvent } from '../services/line/handlers/message.handler.js';
+import { isLineSignatureValid } from '../services/line/signature.js';
 import type {
   LineWebhookRequestBody,
   RequestWithRawBody
-} from '../services/line/types.ts';
+} from '../services/line/types.js';
 
 export const lineWebhookRouter = Router();
 

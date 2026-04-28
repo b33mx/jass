@@ -1,5 +1,5 @@
-import { insertPeriod, selectActivePeriod, selectAllPeriods, selectPeriodById } from './period.repository.ts';
-import type { CreatePeriodDto, Period } from './period.types.ts';
+import { insertPeriod, selectActivePeriod, selectAllPeriods, selectPeriodById } from './period.repository.js';
+import type { CreatePeriodDto, Period } from './period.types.js';
 
 export async function getActivePeriod(): Promise<Period | null> {
   const today = new Date().toISOString().slice(0, 10);

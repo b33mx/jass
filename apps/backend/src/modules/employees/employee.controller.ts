@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { createEmployee, deleteEmployee, getAllEmployees, getEmployeeById, updateEmployee } from './employee.service.ts';
+import { createEmployee, deleteEmployee, getAllEmployees, getEmployeeById, updateEmployee } from './employee.service.js';
 
 const employeeSchema = z.object({
   firstName: z.string().min(1, 'ต้องระบุชื่อ'),

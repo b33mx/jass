@@ -1,9 +1,9 @@
-import { replyToLine } from '../client.ts';
-import { createAttendanceFlexMessage } from '../messages/attendance-menu.ts';
-import { createEmployeeFlexMessage } from '../messages/employee-menu.ts';
-import type { LineEvent } from '../types.ts';
-import { env } from '../../../config/env.ts';
-import { getAllEmployees } from '../../../modules/employees/employee.service.ts';
+import { replyToLine } from '../client.js';
+import { createAttendanceFlexMessage } from '../messages/attendance-menu.js';
+import { createEmployeeFlexMessage } from '../messages/employee-menu.js';
+import type { LineEvent } from '../types.js';
+import { env } from '../../../config/env.js';
+import { getAllEmployees } from '../../../modules/employees/employee.service.js';
 
 const TRIGGER_MENU = '>พนักงาน';
 const TRIGGER_LIST = '>รายชื่อ';

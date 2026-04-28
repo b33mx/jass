@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { createPeriod, getActivePeriod, getAllPeriods } from './period.service.ts';
+import { createPeriod, getActivePeriod, getAllPeriods } from './period.service.js';
 
 const createPeriodSchema = z.object({
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'รูปแบบวันที่ต้องเป็น YYYY-MM-DD'),

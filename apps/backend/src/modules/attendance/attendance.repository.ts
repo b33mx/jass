@@ -1,5 +1,5 @@
-import { supabase } from '../../lib/supabase.ts';
-import type { Attendance } from './attendance.types.ts';
+import { supabase } from '../../lib/supabase.js';
+import type { Attendance } from './attendance.types.js';
 
 const ATTENDANCE_FIELDS = 'attendance_id, attendance_date, employee_id, period_id, morning_check, afternoon_check, ot, created_at';
 

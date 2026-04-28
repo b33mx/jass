@@ -1,6 +1,6 @@
-import { selectAttendanceByPeriodAndDate, selectLoggedDatesByPeriod, upsertAttendanceBatch } from './attendance.repository.ts';
-import { getPeriodById } from '../periods/period.service.ts';
-import type { Attendance, BatchAttendanceDto } from './attendance.types.ts';
+import { selectAttendanceByPeriodAndDate, selectLoggedDatesByPeriod, upsertAttendanceBatch } from './attendance.repository.js';
+import { getPeriodById } from '../periods/period.service.js';
+import type { Attendance, BatchAttendanceDto } from './attendance.types.js';
 
 function eachDayInRange(start: string, end: string): string[] {
   const dates: string[] = [];

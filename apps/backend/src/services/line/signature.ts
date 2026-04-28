@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import { env } from '../../config/env.ts';
-import type { RequestWithRawBody } from './types.ts';
+import { env } from '../../config/env.js';
+import type { RequestWithRawBody } from './types.js';
 
 export function isLineSignatureValid(req: RequestWithRawBody): boolean {
   if (!env.LINE_CHANNEL_SECRET) {

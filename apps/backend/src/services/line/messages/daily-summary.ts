@@ -1,8 +1,8 @@
-import { selectAllEmployees } from '../../../modules/employees/employee.repository.ts';
-import { selectAttendanceByPeriodAndDate } from '../../../modules/attendance/attendance.repository.ts';
-import { selectActivePeriod } from '../../../modules/periods/period.repository.ts';
-import type { CreateTaskDto } from '../../../modules/tasks/task.types.ts';
-import { broadcastToLine } from '../client.ts';
+import { selectAllEmployees } from '../../../modules/employees/employee.repository.js';
+import { selectAttendanceByPeriodAndDate } from '../../../modules/attendance/attendance.repository.js';
+import { selectActivePeriod } from '../../../modules/periods/period.repository.js';
+import type { CreateTaskDto } from '../../../modules/tasks/task.types.js';
+import { broadcastToLine } from '../client.js';
 
 function formatThaiDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');

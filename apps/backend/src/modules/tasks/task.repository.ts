@@ -1,5 +1,5 @@
-import { supabase } from '../../lib/supabase.ts';
-import type { Task } from '../../models/task.model.ts';
+import { supabase } from '../../lib/supabase.js';
+import type { Task } from '../../models/task.model.js';
 
 const TASK_FIELDS = 'task_id, task_date, task, detail, employee_ids, created_at';
 

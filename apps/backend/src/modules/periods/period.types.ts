@@ -1,4 +1,4 @@
-export type { Period } from '../../models/period.model.ts';
+export type { Period } from '../../models/period.model.js';
 
 export interface CreatePeriodDto {
   start_date: string;

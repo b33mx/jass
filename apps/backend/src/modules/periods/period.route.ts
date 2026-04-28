@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { handleCreatePeriod, handleGetActivePeriod, handleGetAllPeriods } from './period.controller.ts';
+import { handleCreatePeriod, handleGetActivePeriod, handleGetAllPeriods } from './period.controller.js';
 
 export const periodRouter = Router();
 

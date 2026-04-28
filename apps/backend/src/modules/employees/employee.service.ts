@@ -4,8 +4,8 @@ import {
   selectEmployeeById,
   softDeleteEmployeeById,
   updateEmployeeById,
-} from './employee.repository.ts';
-import type { CreateEmployeeDto, Employee } from './employee.types.ts';
+} from './employee.repository.js';
+import type { CreateEmployeeDto, Employee } from './employee.types.js';
 
 function calcOtRate(wage: number): number {
   return parseFloat(((wage / 8) * 1.5).toFixed(2));

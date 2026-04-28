@@ -1,10 +1,10 @@
 import type { Express } from 'express';
-import { attendanceRouter } from '../modules/attendance/attendance.route.ts';
-import { employeeRouter } from '../modules/employees/employee.route.ts';
-import { periodRouter } from '../modules/periods/period.route.ts';
-import { taskRouter } from '../modules/tasks/task.route.ts';
-import { healthRouter } from './health.route.ts';
-import { lineWebhookRouter } from './line-webhook.route.ts';
+import { attendanceRouter } from '../modules/attendance/attendance.route.js';
+import { employeeRouter } from '../modules/employees/employee.route.js';
+import { periodRouter } from '../modules/periods/period.route.js';
+import { taskRouter } from '../modules/tasks/task.route.js';
+import { healthRouter } from './health.route.js';
+import { lineWebhookRouter } from './line-webhook.route.js';
 
 export function registerRoutes(app: Express) {
   app.use('/health', healthRouter);

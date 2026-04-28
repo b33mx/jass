@@ -5,7 +5,7 @@ import {
   handleDeleteEmployee,
   handleGetEmployeeById,
   handleUpdateEmployee,
-} from './employee.controller.ts';
+} from './employee.controller.js';
 
 export const employeeRouter = Router();
 

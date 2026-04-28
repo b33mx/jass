@@ -1,5 +1,5 @@
-import { supabase } from '../../lib/supabase.ts';
-import type { Employee } from './employee.types.ts';
+import { supabase } from '../../lib/supabase.js';
+import type { Employee } from './employee.types.js';
 
 const EMPLOYEE_FIELDS = 'employee_id, first_name, last_name, wage, ot_rate, is_active, created_at, updated_at';
 

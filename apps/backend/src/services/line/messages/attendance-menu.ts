@@ -1,4 +1,4 @@
-import type { LineMessage } from '../types.ts';
+import type { LineMessage } from '../types.js';
 
 export function createAttendanceFlexMessage(liffId: string): LineMessage {
   const liffBase = `https://liff.line.me/${liffId}`;

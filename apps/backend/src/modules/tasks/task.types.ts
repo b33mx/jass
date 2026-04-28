@@ -1,4 +1,4 @@
-export type { Task } from '../../models/task.model.ts';
+export type { Task } from '../../models/task.model.js';
 
 export interface CreateTaskDto {
   task_date: string;

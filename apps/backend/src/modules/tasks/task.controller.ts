@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { createTasks } from './task.service.ts';
+import { createTasks } from './task.service.js';
 
 const batchSchema = z.object({
   tasks: z

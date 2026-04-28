@@ -1,5 +1,5 @@
-import { supabase } from '../../lib/supabase.ts';
-import type { Period } from './period.types.ts';
+import { supabase } from '../../lib/supabase.js';
+import type { Period } from './period.types.js';
 
 const PERIOD_FIELDS = 'period_id, start_date, end_date, is_active, created_at';
 

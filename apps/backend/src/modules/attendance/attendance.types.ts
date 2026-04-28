@@ -1,4 +1,4 @@
-export type { Attendance } from '../../models/attendance.model.ts';
+export type { Attendance } from '../../models/attendance.model.js';
 
 export interface CreateAttendanceDto {
   attendance_date: string;

@@ -1,5 +1,5 @@
-import { env } from '../../config/env.ts';
-import type { LineMessage } from './types.ts';
+import { env } from '../../config/env.js';
+import type { LineMessage } from './types.js';
 
 export async function broadcastToLine(messages: LineMessage[]): Promise<void> {
   if (!env.LINE_CHANNEL_ACCESS_TOKEN) {
