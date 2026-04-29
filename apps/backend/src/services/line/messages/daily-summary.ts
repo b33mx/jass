@@ -31,28 +31,30 @@ export async function sendDailySummary(date: string, tasks: CreateTaskDto[]): Pr
   const present = attendance.filter((a) => a.morning_check || a.afternoon_check).length;
   const absent = attendance.filter((a) => !a.morning_check && !a.afternoon_check).length;
 
-  const taskLines = tasks
-    .map((t, i) => {
-      const ids = t.employee_ids
-        .split(',')
-        .map((s) => parseInt(s.trim(), 10))
-        .filter((n) => !isNaN(n) && n > 0);
-      const names = ids
-        .map((id) => employeeMap.get(id))
-        .filter(Boolean)
-        .join(', ');
-      const detail = t.detail ? ` (${t.detail})` : '';
-      const responsible = names ? `\n    👤 ${names}` : '';
-      return `${i + 1}. ${t.task}${detail}${responsible}`;
-    })
-    .join('\n');
+  const taskLines = tasks.length === 0
+    ? '—'
+    : tasks
+        .map((t, i) => {
+          const ids = t.employee_ids
+            .split(',')
+            .map((s) => parseInt(s.trim(), 10))
+            .filter((n) => !isNaN(n) && n > 0);
+          const names = ids
+            .map((id) => employeeMap.get(id))
+            .filter(Boolean)
+            .join(', ');
+          const detail = t.detail ? ` (${t.detail})` : '';
+          const responsible = names ? `\n    👤 ${names}` : '';
+          return `${i + 1}. ${t.task}${detail}${responsible}`;
+        })
+        .join('\n');
 
   const text = [
     `📋 สรุปการทำงานประจำวัน`,
     `🗓 ${formatThaiDate(date)}`,
     '',
     `✅ มาทำงาน  ${present} คน`,
-    `❌ ขาดงาน   ${absent} คน`,
+    `❌ หยุดงาน   ${absent} คน`,
     '',
     '📝 งานที่ทำวันนี้',
     taskLines,

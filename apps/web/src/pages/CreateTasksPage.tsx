@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { createTasks } from '../api/task.api';
+import { createTasks, getTasksForDate, replaceTasksForDate, triggerDailySummary, uploadTaskImages } from '../api/task.api';
+import type { ExistingTaskImage } from '../api/task.api';
 
 interface Employee {
   employee_id: number;
   name: string;
 }
 
+const MAX_IMAGES = 5;
+
 interface TaskEntry {
   task: string;
   detail: string;
   employeeIds: number[];
+  existingImages: ExistingTaskImage[];
+  newImages: File[];
   taskError?: string;
 }
 
@@ -19,10 +24,11 @@ interface LocationState {
   employees: Employee[];
   period: { start_date: string; end_date: string };
   remainingCount: number;
+  fromOverview?: boolean;
 }
 
 function emptyEntry(): TaskEntry {
-  return { task: '', detail: '', employeeIds: [] };
+  return { task: '', detail: '', employeeIds: [], existingImages: [], newImages: [] };
 }
 
 function formatThaiDate(dateStr: string): string {
@@ -126,6 +132,7 @@ export function CreateTasksPage() {
 
   const [entries, setEntries] = useState<TaskEntry[]>([emptyEntry()]);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -133,9 +140,41 @@ export function CreateTasksPage() {
     if (!state?.date) navigate('/attendance', { replace: true });
   }, [state, navigate]);
 
+  useEffect(() => {
+    if (!state?.date || !state.fromOverview) return;
+    setLoadingTasks(true);
+    getTasksForDate(state.date)
+      .then((tasks) => {
+        if (tasks.length === 0) return;
+        setEntries(
+          tasks.map((t) => ({
+            task: t.task,
+            detail: t.detail ?? '',
+            employeeIds: t.employee_ids
+              ? t.employee_ids.split(',').map(Number).filter(Boolean)
+              : [],
+            existingImages: t.images ?? [],
+            newImages: [],
+          }))
+        );
+      })
+      .catch(() => { /* keep empty entry on error */ })
+      .finally(() => setLoadingTasks(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!state?.date) return null;
 
   const { date, employees, period, remainingCount } = state;
+
+  if (loadingTasks) {
+    return (
+      <div className="mx-auto max-w-md space-y-3 px-4">
+        <div className="h-32 animate-pulse rounded-3xl bg-zinc-200" />
+        <div className="h-24 animate-pulse rounded-2xl bg-zinc-100" />
+        <div className="h-24 animate-pulse rounded-2xl bg-zinc-100" />
+      </div>
+    );
+  }
 
   function updateEntry(index: number, patch: Partial<TaskEntry>) {
     setEntries((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
@@ -168,14 +207,24 @@ export function CreateTasksPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await createTasks(
-        entries.map((e) => ({
-          task_date: date,
-          task: e.task.trim(),
-          detail: e.detail.trim() || undefined,
-          employee_ids: e.employeeIds.join(','),
-        }))
+      const uploadedImages = await Promise.all(
+        entries.map((e) => (e.newImages.length > 0 ? uploadTaskImages(e.newImages, period.start_date) : Promise.resolve([])))
       );
+      const payload = entries.map((e, i) => ({
+        task_date: date,
+        task: e.task.trim(),
+        detail: e.detail.trim() || undefined,
+        employee_ids: e.employeeIds.join(','),
+        images: [
+          ...e.existingImages.map(({ file_name, public_url, storage_path }) => ({ file_name, public_url, storage_path })),
+          ...uploadedImages[i],
+        ],
+      }));
+      if (state?.fromOverview) {
+        await replaceTasksForDate(date, payload);
+      } else {
+        await createTasks(payload);
+      }
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่');
@@ -346,6 +395,76 @@ export function CreateTasksPage() {
                       onChange={(ids) => updateEntry(i, { employeeIds: ids })}
                     />
                   </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-zinc-600">
+                      รูปภาพ{' '}
+                      <span className="font-normal text-zinc-400">(สูงสุด {MAX_IMAGES} รูป)</span>
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {entry.existingImages.map((img) => (
+                        <div key={img.image_id} className="relative h-16 w-16 shrink-0">
+                          <img
+                            src={img.public_url}
+                            alt={img.file_name}
+                            className="h-full w-full rounded-xl object-cover ring-1 ring-zinc-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateEntry(i, {
+                                existingImages: entry.existingImages.filter((x) => x.image_id !== img.image_id),
+                              })
+                            }
+                            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-white shadow"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                      {entry.newImages.map((file, imgIdx) => (
+                        <div key={`new-${imgIdx}`} className="relative h-16 w-16 shrink-0">
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt=""
+                            className="h-full w-full rounded-xl object-cover ring-1 ring-zinc-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateEntry(i, { newImages: entry.newImages.filter((_, j) => j !== imgIdx) })
+                            }
+                            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-white shadow"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                      {entry.existingImages.length + entry.newImages.length < MAX_IMAGES && (
+                        <label className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-zinc-300 text-zinc-400 transition hover:border-brandRed hover:text-brandRed">
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                          </svg>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="sr-only"
+                            onChange={(e) => {
+                              const picked = Array.from(e.target.files ?? []);
+                              const allowed = MAX_IMAGES - entry.existingImages.length - entry.newImages.length;
+                              updateEntry(i, { newImages: [...entry.newImages, ...picked].slice(0, entry.newImages.length + allowed) });
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -382,7 +501,12 @@ export function CreateTasksPage() {
 
           <button
             type="button"
-            onClick={() => navigate('/attendance')}
+            onClick={() => {
+              triggerDailySummary(date).catch((err) => {
+                console.error('[tasks] triggerDailySummary failed:', err);
+              });
+              navigate('/attendance');
+            }}
             className="mt-2.5 w-full rounded-2xl py-3 text-sm font-medium text-zinc-400 transition hover:text-zinc-600"
           >
             ข้ามขั้นตอนนี้

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getAttendanceForDate, getMissingDates, saveAttendanceBatch } from '../api/attendance.api';
 import { getAllEmployees } from '../api/employee.api';
 import { getActivePeriod, type Period } from '../api/period.api';
+import { triggerDailySummary } from '../api/task.api';
 
 function NoPeriodState() {
   const navigate = useNavigate();
@@ -56,8 +57,9 @@ interface AttendanceRow {
   name: string;
   morning_check: boolean;
   afternoon_check: boolean;
-  ot_hours: number;
-  ot_minutes: number;
+  ot_time: string;
+  is_holiday: boolean;
+  rowError?: boolean;
 }
 
 type Toast = { type: 'success' | 'error'; message: string } | null;
@@ -67,14 +69,15 @@ function formatThaiDate(dateStr: string): string {
   return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' });
 }
 
-function otToDecimal(hours: number, minutes: number): number {
-  return parseFloat((hours + minutes / 60).toFixed(4));
-}
-
-function decimalToOt(ot: number): { hours: number; minutes: number } {
+function decimalToOtTime(ot: number): string {
   const hours = Math.floor(ot);
   const minutes = Math.round((ot - hours) * 60);
-  return { hours, minutes };
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function otTimeToDecimal(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return parseFloat(((h || 0) + (m || 0) / 60).toFixed(4));
 }
 
 export function AttendancePage() {
@@ -121,14 +124,13 @@ export function AttendancePage() {
             const existingMap = new Map(existing.map((a) => [a.employee_id, a]));
             setRows(employees.map((emp) => {
               const att = existingMap.get(emp.employee_id);
-              const { hours, minutes } = att ? decimalToOt(att.ot) : { hours: 0, minutes: 0 };
               return {
                 employee_id: emp.employee_id,
                 name: `${emp.first_name} ${emp.last_name}`,
                 morning_check: att?.morning_check ?? false,
                 afternoon_check: att?.afternoon_check ?? false,
-                ot_hours: hours,
-                ot_minutes: minutes,
+                ot_time: att ? decimalToOtTime(att.ot) : '00:00',
+                is_holiday: att ? (!att.morning_check && !att.afternoon_check && att.ot === 0) : false,
               };
             }));
           } finally {
@@ -164,14 +166,13 @@ export function AttendancePage() {
       setRows(
         employees.map((emp) => {
           const att = existingMap.get(emp.employee_id);
-          const { hours, minutes } = att ? decimalToOt(att.ot) : { hours: 0, minutes: 0 };
           return {
             employee_id: emp.employee_id,
             name: `${emp.first_name} ${emp.last_name}`,
             morning_check: att?.morning_check ?? false,
             afternoon_check: att?.afternoon_check ?? false,
-            ot_hours: hours,
-            ot_minutes: minutes,
+            ot_time: att ? decimalToOtTime(att.ot) : '00:00',
+            is_holiday: false,
           };
         })
       );
@@ -189,17 +190,47 @@ export function AttendancePage() {
   }, [period, missingDates, selectedDate, handleDateChange]);
 
   function toggleCheck(index: number, field: 'morning_check' | 'afternoon_check') {
-    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: !r[field] } : r)));
+    setRows((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, [field]: !r[field], rowError: false } : r))
+    );
   }
 
-  function handleOtChange(index: number, field: 'ot_hours' | 'ot_minutes', value: string) {
-    const num = Math.max(0, parseInt(value) || 0);
-    const clamped = field === 'ot_minutes' ? Math.min(59, num) : num;
-    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: clamped } : r)));
+  function toggleHoliday(index: number) {
+    setRows((prev) =>
+      prev.map((r, i) =>
+        i === index
+          ? {
+              ...r,
+              is_holiday: !r.is_holiday,
+              morning_check: false,
+              afternoon_check: false,
+              ot_time: '00:00',
+              rowError: false,
+            }
+          : r
+      )
+    );
+  }
+
+  function handleOtTimeChange(index: number, value: string) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ot_time: value } : r)));
   }
 
   async function handleSubmit() {
     if (!period || !selectedDate || rows.length === 0) return;
+
+    const hasInvalid = rows.some((r) => !r.morning_check && !r.afternoon_check && !r.is_holiday);
+    if (hasInvalid) {
+      setRows((prev) =>
+        prev.map((r) => ({
+          ...r,
+          rowError: !r.morning_check && !r.afternoon_check && !r.is_holiday,
+        }))
+      );
+      setToast({ type: 'error', message: 'กรุณาเลือกอย่างน้อย 1 ตัวเลือก (เช้า / บ่าย / วันหยุด) ให้ครบทุกคน' });
+      return;
+    }
+
     setSubmitting(true);
     try {
       await saveAttendanceBatch({
@@ -207,15 +238,28 @@ export function AttendancePage() {
         attendance_date: selectedDate,
         records: rows.map((r) => ({
           employee_id: r.employee_id,
-          morning_check: r.morning_check,
-          afternoon_check: r.afternoon_check,
-          ot: otToDecimal(r.ot_hours, r.ot_minutes),
+          morning_check: r.is_holiday ? false : r.morning_check,
+          afternoon_check: r.is_holiday ? false : r.afternoon_check,
+          ot: r.is_holiday ? 0 : otTimeToDecimal(r.ot_time),
         })),
       });
       const checkedIn = rows
         .filter((r) => r.morning_check || r.afternoon_check)
         .map((r) => ({ employee_id: r.employee_id, name: r.name }));
       const remaining = missingDates.filter((d) => d !== selectedDate);
+
+      if (checkedIn.length === 0) {
+        triggerDailySummary(selectedDate).catch((err) => {
+          console.error('[attendance] triggerDailySummary failed:', err);
+        });
+        if (remaining.length === 0) {
+          navigate('/');
+        } else {
+          navigate('/attendance');
+        }
+        return;
+      }
+
       navigate('/tasks/new', {
         state: {
           date: selectedDate,
@@ -273,7 +317,6 @@ export function AttendancePage() {
 
           {/* Section 1: Date selector */}
           {state?.date ? (
-            /* มาจาก overview — แสดงวันที่เป็น label คงที่ */
             <div className="flex items-center gap-3 rounded-2xl bg-zinc-50 px-4 py-3 ring-1 ring-zinc-100">
               <svg className="h-4 w-4 shrink-0 text-brandRed" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -329,6 +372,7 @@ export function AttendancePage() {
                     <thead>
                       <tr className="bg-zinc-50 text-left">
                         <th className="px-4 py-3 font-semibold text-zinc-600">ชื่อ-นามสกุล</th>
+                        <th className="px-3 py-3 text-center font-semibold text-amber-600">หยุด</th>
                         <th className="px-3 py-3 text-center font-semibold text-zinc-600">เช้า</th>
                         <th className="px-3 py-3 text-center font-semibold text-zinc-600">บ่าย</th>
                         <th className="px-3 py-3 text-center font-semibold text-zinc-600">OT</th>
@@ -336,44 +380,50 @@ export function AttendancePage() {
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
                       {rows.map((row, i) => (
-                        <tr key={row.employee_id} className="bg-white">
-                          <td className="px-4 py-3 font-medium text-zinc-800">{row.name}</td>
+                        <tr
+                          key={row.employee_id}
+                          className={row.rowError ? 'bg-red-50' : row.is_holiday ? 'bg-amber-50/60' : 'bg-white'}
+                        >
+                          <td className="px-4 py-3 font-medium text-zinc-800">
+                            <div>{row.name}</div>
+                            {row.rowError && (
+                              <p className="mt-0.5 text-[11px] text-red-500">เลือกอย่างน้อย 1 ตัวเลือก</p>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={row.is_holiday}
+                              onChange={() => toggleHoliday(i)}
+                              className="h-5 w-5 cursor-pointer accent-amber-500"
+                            />
+                          </td>
                           <td className="px-3 py-3 text-center">
                             <input
                               type="checkbox"
                               checked={row.morning_check}
+                              disabled={row.is_holiday}
                               onChange={() => toggleCheck(i, 'morning_check')}
-                              className="h-5 w-5 cursor-pointer accent-brandRed"
+                              className="h-5 w-5 cursor-pointer accent-brandRed disabled:cursor-not-allowed disabled:opacity-30"
                             />
                           </td>
                           <td className="px-3 py-3 text-center">
                             <input
                               type="checkbox"
                               checked={row.afternoon_check}
+                              disabled={row.is_holiday}
                               onChange={() => toggleCheck(i, 'afternoon_check')}
-                              className="h-5 w-5 cursor-pointer accent-brandRed"
+                              className="h-5 w-5 cursor-pointer accent-brandRed disabled:cursor-not-allowed disabled:opacity-30"
                             />
                           </td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-1 justify-center">
-                              <input
-                                type="number"
-                                min={0}
-                                value={row.ot_hours}
-                                onChange={(e) => handleOtChange(i, 'ot_hours', e.target.value)}
-                                className="w-12 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-center text-sm outline-none focus:border-brandRed focus:ring-1 focus:ring-brandRed/20"
-                              />
-                              <span className="text-xs text-zinc-400">ชม.</span>
-                              <input
-                                type="number"
-                                min={0}
-                                max={59}
-                                value={row.ot_minutes}
-                                onChange={(e) => handleOtChange(i, 'ot_minutes', e.target.value)}
-                                className="w-12 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-center text-sm outline-none focus:border-brandRed focus:ring-1 focus:ring-brandRed/20"
-                              />
-                              <span className="text-xs text-zinc-400">น.</span>
-                            </div>
+                          <td className="px-3 py-3 text-center">
+                            <input
+                              type="time"
+                              value={row.ot_time}
+                              disabled={row.is_holiday}
+                              onChange={(e) => handleOtTimeChange(i, e.target.value)}
+                              className="w-24 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-center text-sm outline-none focus:border-brandRed focus:ring-1 focus:ring-brandRed/20 disabled:cursor-not-allowed disabled:opacity-30"
+                            />
                           </td>
                         </tr>
                       ))}
