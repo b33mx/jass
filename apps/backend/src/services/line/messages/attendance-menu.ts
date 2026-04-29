@@ -1,6 +1,6 @@
 import type { LineMessage } from '../types.js';
 
-export function createAttendanceFlexMessage(liffId: string): LineMessage {
+export function createAttendanceFlexMessage(liffId: string, apiBaseUrl: string): LineMessage {
   const liffBase = `https://liff.line.me/${liffId}`;
 
   return {
@@ -18,6 +18,7 @@ export function createAttendanceFlexMessage(liffId: string): LineMessage {
             text: 'ลงเวลางาน',
             weight: 'bold',
             size: 'lg',
+            color: '#7C2D12',
           },
           {
             type: 'separator',
@@ -32,6 +33,17 @@ export function createAttendanceFlexMessage(liffId: string): LineMessage {
               type: 'uri',
               label: 'ลงเวลางาน',
               uri: `${liffBase}/attendance`,
+            },
+          },
+          {
+            type: 'button',
+            style: 'primary',
+            color: '#fada3d',
+            height: 'sm',
+            action: {
+              type: 'uri',
+              label: 'รายงานการทำงานงวดปัจจุบัน',
+              uri: `${apiBaseUrl}/api/reports/work/current`,
             },
           },
         ],

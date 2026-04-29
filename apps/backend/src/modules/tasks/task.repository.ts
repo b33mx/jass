@@ -49,6 +49,18 @@ export async function deleteTasksByDate(date: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+export async function getTasksByDateRange(start: string, end: string): Promise<Task[]> {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(TASK_SELECT)
+    .gte('task_date', start)
+    .lte('task_date', end)
+    .order('task_date', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as Task[];
+}
+
 export async function getTasksByDate(date: string): Promise<Task[]> {
   const { data, error } = await supabase
     .from('tasks')

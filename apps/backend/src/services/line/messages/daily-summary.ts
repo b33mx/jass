@@ -3,6 +3,7 @@ import { selectAttendanceByPeriodAndDate } from '../../../modules/attendance/att
 import { selectActivePeriod } from '../../../modules/periods/period.repository.js';
 import type { CreateTaskDto } from '../../../modules/tasks/task.types.js';
 import { broadcastToLine } from '../client.js';
+import { env } from '../../../config/env.js';
 
 function formatThaiDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
@@ -60,5 +61,8 @@ export async function sendDailySummary(date: string, tasks: CreateTaskDto[]): Pr
     taskLines,
   ].join('\n');
 
-  await broadcastToLine([{ type: 'text', text }]);
+  const reportUrl = `${env.API_BASE_URL}/api/reports/daily?date=${date}`;
+  const fullText = `${text}\n\n📄 รายงานประจำวัน\n${reportUrl}`;
+
+  await broadcastToLine([{ type: 'text', text: fullText }]);
 }

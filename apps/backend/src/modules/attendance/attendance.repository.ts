@@ -25,6 +25,16 @@ export async function selectLoggedDatesByPeriod(periodId: number): Promise<strin
   return Array.from(dates);
 }
 
+export async function selectAttendanceByPeriodId(periodId: number): Promise<Attendance[]> {
+  const { data, error } = await supabase
+    .from('attendance')
+    .select(ATTENDANCE_FIELDS)
+    .eq('period_id', periodId)
+    .order('attendance_date', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Attendance[];
+}
+
 export async function upsertAttendanceBatch(
   records: Array<{
     attendance_date: string;

@@ -9,6 +9,7 @@ import { CreateTasksPage } from './pages/CreateTasksPage';
 import { EditEmployeePage } from './pages/EditEmployeePage';
 import { EditEmployeeSelectPage } from './pages/EditEmployeeSelectPage';
 import { HomePage } from './pages/HomePage';
+import { WorkReportPage } from './pages/WorkReportPage';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/employees/:id/edit" element={<EditEmployeePage />} />
         <Route path="/attendance" element={<AttendanceOverviewPage />} />
         <Route path="/attendance/log" element={<AttendancePage />} />
+        <Route path="/reports/work" element={<WorkReportPage />} />
         <Route path="/periods/new" element={<CreatePeriodPage />} />
         <Route path="/tasks/new" element={<CreateTasksPage />} />
       </Routes>

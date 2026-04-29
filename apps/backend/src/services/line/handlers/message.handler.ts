@@ -21,7 +21,7 @@ export async function handleLineEvent(event: LineEvent): Promise<void> {
   }
 
   if (userText === TRIGGER_ATTENDANCE) {
-    await replyToLine(event.replyToken, [createAttendanceFlexMessage(env.LIFF_ID)]);
+    await replyToLine(event.replyToken, [createAttendanceFlexMessage(env.LIFF_ID, env.API_BASE_URL)]);
     return;
   }
 
