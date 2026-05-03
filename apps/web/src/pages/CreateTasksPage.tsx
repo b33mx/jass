@@ -33,8 +33,8 @@ function emptyEntry(): TaskEntry {
   return {
     task: '',
     detail: '',
-    startTime: '',
-    endTime: '',
+    startTime: '08:00',
+    endTime: '17:00',
     employeeIds: [],
     existingImages: [],
     newImages: [],
@@ -422,23 +422,23 @@ export function CreateTasksPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-600">เวลาเริ่ม</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="min-w-0">
+                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">เวลาเริ่ม</label>
                       <input
                         type="time"
                         value={entry.startTime}
                         onChange={(e) => updateEntry(i, { startTime: e.target.value })}
-                        className="block h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-brandRed focus:ring-2 focus:ring-brandRed/10"
+                        className="block h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium outline-none transition focus:border-brandRed focus:ring-2 focus:ring-brandRed/10"
                       />
                     </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-600">เวลาสิ้นสุด</label>
+                    <div className="min-w-0">
+                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">เวลาสิ้นสุด</label>
                       <input
                         type="time"
                         value={entry.endTime}
                         onChange={(e) => updateEntry(i, { endTime: e.target.value })}
-                        className="block h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-brandRed focus:ring-2 focus:ring-brandRed/10"
+                        className="block h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium outline-none transition focus:border-brandRed focus:ring-2 focus:ring-brandRed/10"
                       />
                     </div>
                   </div>

@@ -44,9 +44,10 @@ export async function sendDailySummary(date: string, tasks: CreateTaskDto[]): Pr
             .map((id) => employeeMap.get(id))
             .filter(Boolean)
             .join(', ');
+          const time = t.start_time && t.end_time ? ` [${t.start_time}-${t.end_time}]` : '';
           const detail = t.detail ? ` (${t.detail})` : '';
           const responsible = names ? `\n    👤 ${names}` : '';
-          return `${i + 1}. ${t.task}${detail}${responsible}`;
+          return `${i + 1}. ${t.task}${time}${detail}${responsible}`;
         })
         .join('\n');
 

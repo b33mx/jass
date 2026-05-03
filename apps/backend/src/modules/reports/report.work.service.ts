@@ -251,12 +251,12 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
       const taskText = `${t.task}${timeStr}${detail}`;
 
       const bodyH = Math.max(
-        22,
+        24,
         Math.max(
-          doc.heightOfString(shortThaiDate(t.task_date), { width: c1 - 8 }),
-          doc.heightOfString(taskText, { width: c2 - 8 }),
-          doc.heightOfString(names || '-', { width: c3 - 8 })
-        ) + 10
+          doc.heightOfString(shortThaiDate(t.task_date), { width: c1 - 10 }),
+          doc.heightOfString(taskText, { width: c2 - 10 }),
+          doc.heightOfString(names || '-', { width: c3 - 10 })
+        ) + 14
       );
       y = pageBreak(doc, y, bodyH);
 
@@ -264,9 +264,9 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
       doc.strokeColor(C.border).lineWidth(0.35).rect(M, y, CW, bodyH).stroke();
 
       doc.font('Regular').fontSize(9).fillColor(C.text);
-      doc.text(shortThaiDate(t.task_date), M + 4, y + 6, { width: c1 - 8 });
-      doc.text(taskText, M + c1 + 4, y + 6, { width: c2 - 8 });
-      doc.text(names || '-', M + c1 + c2 + 4, y + 6, { width: c3 - 8 });
+      doc.text(shortThaiDate(t.task_date), M + 5, y + 8, { width: c1 - 10 });
+      doc.text(taskText, M + c1 + 5, y + 8, { width: c2 - 10 });
+      doc.text(names || '-', M + c1 + c2 + 5, y + 8, { width: c3 - 10 });
       y += bodyH;
     });
 
