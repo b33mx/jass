@@ -246,8 +246,9 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
     sorted.forEach((t, idx) => {
       const ids = t.employee_ids.split(',').map(Number).filter(Boolean);
       const names = ids.map((id) => empMap.get(id)?.first_name).filter(Boolean).join(', ');
+      const timeStr = t.start_time && t.end_time ? ` (${t.start_time} - ${t.end_time})` : '';
       const detail = t.detail?.trim() ? `\n- ${t.detail.trim()}` : '';
-      const taskText = `${t.task}${detail}`;
+      const taskText = `${t.task}${timeStr}${detail}`;
 
       const bodyH = Math.max(
         22,

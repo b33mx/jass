@@ -3,12 +3,12 @@ import type { Task, TaskImage } from '../../models/task.model.js';
 import type { TaskImageDto } from './task.types.js';
 
 const TASK_SELECT = `
-  task_id, task_date, task, detail, employee_ids, created_at,
+  task_id, task_date, task, detail, start_time, end_time, employee_ids, created_at,
   images:task_images(image_id, task_id, file_name, public_url, storage_path, module, created_at)
 `.trim();
 
 export async function insertTasks(
-  records: Array<{ task_date: string; task: string; detail?: string; employee_ids: string }>
+  records: Array<{ task_date: string; task: string; detail?: string; start_time?: string; end_time?: string; employee_ids: string }>
 ): Promise<{ task_id: number }[]> {
   const { data, error } = await supabase
     .from('tasks')

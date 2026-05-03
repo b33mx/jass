@@ -13,6 +13,8 @@ export interface CreateTaskPayload {
   task_date: string;
   task: string;
   detail?: string;
+  start_time?: string;
+  end_time?: string;
   employee_ids: string;
   images?: TaskImageData[];
 }
@@ -22,6 +24,8 @@ export interface Task {
   task_date: string;
   task: string;
   detail: string | null;
+  start_time: string | null;
+  end_time: string | null;
   employee_ids: string;
   images: ExistingTaskImage[];
   created_at: string;

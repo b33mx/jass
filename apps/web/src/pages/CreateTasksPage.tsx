@@ -13,6 +13,8 @@ const MAX_IMAGES = 5;
 interface TaskEntry {
   task: string;
   detail: string;
+  startTime: string;
+  endTime: string;
   employeeIds: number[];
   existingImages: ExistingTaskImage[];
   newImages: File[];
@@ -28,7 +30,47 @@ interface LocationState {
 }
 
 function emptyEntry(): TaskEntry {
-  return { task: '', detail: '', employeeIds: [], existingImages: [], newImages: [] };
+  return {
+    task: '',
+    detail: '',
+    startTime: '',
+    endTime: '',
+    employeeIds: [],
+    existingImages: [],
+    newImages: [],
+  };
+}
+
+function AutoResizeTextarea({
+  value,
+  onChange,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={1}
+      className={`block w-full resize-none overflow-hidden rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brandRed focus:ring-2 focus:ring-brandRed/10 ${className}`}
+    />
+  );
 }
 
 function formatThaiDate(dateStr: string): string {
@@ -150,6 +192,8 @@ export function CreateTasksPage() {
           tasks.map((t) => ({
             task: t.task,
             detail: t.detail ?? '',
+            startTime: t.start_time ?? '',
+            endTime: t.end_time ?? '',
             employeeIds: t.employee_ids
               ? t.employee_ids.split(',').map(Number).filter(Boolean)
               : [],
@@ -214,6 +258,8 @@ export function CreateTasksPage() {
         task_date: date,
         task: e.task.trim(),
         detail: e.detail.trim() || undefined,
+        start_time: e.startTime || undefined,
+        end_time: e.endTime || undefined,
         employee_ids: e.employeeIds.join(','),
         images: [
           ...e.existingImages.map(({ file_name, public_url, storage_path }) => ({ file_name, public_url, storage_path })),
@@ -376,14 +422,33 @@ export function CreateTasksPage() {
                     )}
                   </div>
 
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-zinc-600">เวลาเริ่ม</label>
+                      <input
+                        type="time"
+                        value={entry.startTime}
+                        onChange={(e) => updateEntry(i, { startTime: e.target.value })}
+                        className="block h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-brandRed focus:ring-2 focus:ring-brandRed/10"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-zinc-600">เวลาสิ้นสุด</label>
+                      <input
+                        type="time"
+                        value={entry.endTime}
+                        onChange={(e) => updateEntry(i, { endTime: e.target.value })}
+                        className="block h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-brandRed focus:ring-2 focus:ring-brandRed/10"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-zinc-600">ดีเทล</label>
-                    <input
-                      type="text"
+                    <label className="mb-1.5 block text-xs font-medium text-zinc-600">รายละเอียด</label>
+                    <AutoResizeTextarea
                       value={entry.detail}
-                      onChange={(e) => updateEntry(i, { detail: e.target.value })}
+                      onChange={(val) => updateEntry(i, { detail: val })}
                       placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)"
-                      className="block h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-brandRed focus:ring-2 focus:ring-brandRed/10"
                     />
                   </div>
 

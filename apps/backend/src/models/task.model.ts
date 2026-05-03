@@ -13,6 +13,8 @@ export interface Task {
   task_date: string;
   task: string;
   detail: string | null;
+  start_time: string | null;
+  end_time: string | null;
   employee_ids: string;
   images: TaskImage[];
   created_at: string;
