@@ -10,6 +10,8 @@ export interface CreateTaskDto {
   task_date: string;
   task: string;
   detail?: string;
+  start_time?: string;
+  end_time?: string;
   employee_ids: string;
   images?: TaskImageDto[];
 }
@@ -18,5 +20,7 @@ export interface UpdateTaskDto {
   task_date?: string;
   task?: string;
   detail?: string;
+  start_time?: string;
+  end_time?: string;
   employee_ids?: string;
 }
