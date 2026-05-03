@@ -1,5 +1,23 @@
 {
   "installCommand": "npm install --include=optional",
   "buildCommand": "npm run build --workspace apps/web",
-  "outputDirectory": "apps/web/dist"
+  "outputDirectory": "apps/web/dist",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://jass-r9vu.onrender.com/api/:path*"
+    },
+    {
+      "source": "/webhook/:path*",
+      "destination": "https://jass-r9vu.onrender.com/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://jass-r9vu.onrender.com/health"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
