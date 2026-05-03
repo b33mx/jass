@@ -3,6 +3,7 @@ import express, { type Request } from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { registerRoutes } from './routes/index.js';
+import { errorHandler } from './middleware/error.middleware.js';
 
 type RequestWithRawBody = Request & {
   rawBody?: Buffer;
@@ -23,6 +24,8 @@ export function createApp() {
   app.use(morgan('dev'));
 
   registerRoutes(app);
+
+  app.use(errorHandler);
 
   return app;
 }

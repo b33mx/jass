@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { generateDailyReport } from './report.service.js';
 import { generateWorkReport } from './report.work.service.js';
 import { env } from '../../config/env.js';
@@ -16,7 +16,7 @@ function todayInTimezone(timeZone: string): string {
   return `${year}-${month}-${day}`;
 }
 
-export async function handleDailyReport(req: Request, res: Response) {
+export async function handleDailyReport(req: Request, res: Response, next: NextFunction) {
   const date = req.query.date as string | undefined;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     res.status(400).json({ error: 'date query param is required (YYYY-MM-DD)' });
@@ -29,12 +29,11 @@ export async function handleDailyReport(req: Request, res: Response) {
     res.setHeader('Content-Length', pdf.length);
     res.send(pdf);
   } catch (err) {
-    console.error('[reports] generateDailyReport failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถสร้างรายงานได้' });
+    next(err);
   }
 }
 
-export async function handleWorkReport(req: Request, res: Response) {
+export async function handleWorkReport(req: Request, res: Response, next: NextFunction) {
   const date = req.query.date as string | undefined;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     res.status(400).json({ error: 'date query param is required (YYYY-MM-DD)' });
@@ -47,12 +46,11 @@ export async function handleWorkReport(req: Request, res: Response) {
     res.setHeader('Content-Length', buf.length);
     res.send(buf);
   } catch (err) {
-    console.error('[reports] generateWorkReport failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถสร้างรายงานได้' });
+    next(err);
   }
 }
 
-export async function handleCurrentWorkReport(_req: Request, res: Response) {
+export async function handleCurrentWorkReport(_req: Request, res: Response, next: NextFunction) {
   const date = todayInTimezone(env.TZ);
   try {
     const buf = await generateWorkReport(date);
@@ -61,7 +59,6 @@ export async function handleCurrentWorkReport(_req: Request, res: Response) {
     res.setHeader('Content-Length', buf.length);
     res.send(buf);
   } catch (err) {
-    console.error('[reports] handleCurrentWorkReport failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถสร้างรายงานได้' });
+    next(err);
   }
 }

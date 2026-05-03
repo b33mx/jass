@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { getAttendanceForDate, getMissingDates, saveAttendanceBatch } from './attendance.service.js';
 
@@ -15,7 +15,7 @@ const batchSchema = z.object({
   ).min(1),
 });
 
-export async function handleGetMissingDates(req: Request, res: Response) {
+export async function handleGetMissingDates(req: Request, res: Response, next: NextFunction) {
   const periodId = parseInt(req.query.period_id as string, 10);
   if (isNaN(periodId)) {
     res.status(400).json({ error: 'period_id ไม่ถูกต้อง' });
@@ -26,12 +26,11 @@ export async function handleGetMissingDates(req: Request, res: Response) {
     const dates = await getMissingDates(periodId);
     res.json(dates);
   } catch (err) {
-    console.error('[attendance] getMissingDates failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถดึงวันที่ยังไม่ได้ลงเวลาได้' });
+    next(err);
   }
 }
 
-export async function handleGetAttendance(req: Request, res: Response) {
+export async function handleGetAttendance(req: Request, res: Response, next: NextFunction) {
   const periodId = parseInt(req.query.period_id as string, 10);
   const date = req.query.date as string;
 
@@ -44,12 +43,11 @@ export async function handleGetAttendance(req: Request, res: Response) {
     const records = await getAttendanceForDate(periodId, date);
     res.json(records);
   } catch (err) {
-    console.error('[attendance] getAttendance failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลการลงเวลาได้' });
+    next(err);
   }
 }
 
-export async function handleSaveAttendanceBatch(req: Request, res: Response) {
+export async function handleSaveAttendanceBatch(req: Request, res: Response, next: NextFunction) {
   const parsed = batchSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten().fieldErrors });
@@ -60,7 +58,6 @@ export async function handleSaveAttendanceBatch(req: Request, res: Response) {
     const result = await saveAttendanceBatch(parsed.data);
     res.status(201).json(result);
   } catch (err) {
-    console.error('[attendance] saveBatch failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถบันทึกการลงเวลาได้' });
+    next(err);
   }
 }

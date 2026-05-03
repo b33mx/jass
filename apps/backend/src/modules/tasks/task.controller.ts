@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -19,13 +19,15 @@ const taskItemSchema = z.object({
   task_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   task: z.string().min(1),
   detail: z.string().optional(),
+  start_time: z.string().optional(),
+  end_time: z.string().optional(),
   employee_ids: z.string(),
   images: z.array(imageSchema).max(MAX_IMAGES).optional(),
 });
 
 const batchSchema = z.object({ tasks: z.array(taskItemSchema).min(1) });
 
-export async function handleTriggerSummary(req: Request, res: Response) {
+export async function handleTriggerSummary(req: Request, res: Response, next: NextFunction) {
   const { date } = req.body as { date?: string };
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     res.status(400).json({ error: 'date is required (YYYY-MM-DD)' });
@@ -35,12 +37,11 @@ export async function handleTriggerSummary(req: Request, res: Response) {
     await triggerSummary(date);
     res.json({ ok: true });
   } catch (err) {
-    console.error('[tasks] triggerSummary failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถส่งสรุปการทำงานได้' });
+    next(err);
   }
 }
 
-export async function handleGetTasksForDate(req: Request, res: Response) {
+export async function handleGetTasksForDate(req: Request, res: Response, next: NextFunction) {
   const date = req.query.date as string | undefined;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     res.status(400).json({ error: 'date query param is required (YYYY-MM-DD)' });
@@ -50,12 +51,11 @@ export async function handleGetTasksForDate(req: Request, res: Response) {
     const tasks = await getTasksForDate(date);
     res.json(tasks);
   } catch (err) {
-    console.error('[tasks] getTasksForDate failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลงานได้' });
+    next(err);
   }
 }
 
-export async function handleReplaceTasksForDate(req: Request, res: Response) {
+export async function handleReplaceTasksForDate(req: Request, res: Response, next: NextFunction) {
   const parsed = z.object({
     tasks: z.array(taskItemSchema),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -74,12 +74,11 @@ export async function handleReplaceTasksForDate(req: Request, res: Response) {
     }
     res.status(200).json(result);
   } catch (err) {
-    console.error('[tasks] replaceTasksForDate failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถบันทึกงานได้' });
+    next(err);
   }
 }
 
-export async function handleUploadImages(req: Request, res: Response) {
+export async function handleUploadImages(req: Request, res: Response, next: NextFunction) {
   const files = req.files as Express.Multer.File[] | undefined;
   if (!files || files.length === 0) {
     res.status(400).json({ error: 'ไม่พบไฟล์รูปภาพ' });
@@ -125,12 +124,11 @@ export async function handleUploadImages(req: Request, res: Response) {
     );
     res.status(201).json({ files: uploadedFiles });
   } catch (err) {
-    console.error('[tasks] uploadImages failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถอัปโหลดรูปภาพได้' });
+    next(err);
   }
 }
 
-export async function handleCreateTasks(req: Request, res: Response) {
+export async function handleCreateTasks(req: Request, res: Response, next: NextFunction) {
   const parsed = batchSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten().fieldErrors });
@@ -140,7 +138,6 @@ export async function handleCreateTasks(req: Request, res: Response) {
     const result = await createTasks(parsed.data.tasks);
     res.status(201).json(result);
   } catch (err) {
-    console.error('[tasks] createTasks failed:', err);
-    res.status(500).json({ error: 'ไม่สามารถบันทึกงานได้' });
+    next(err);
   }
 }
