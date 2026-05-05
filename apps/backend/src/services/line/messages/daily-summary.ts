@@ -1,6 +1,7 @@
 import { selectAllEmployees } from '../../../modules/employees/employee.repository.js';
 import { selectAttendanceByPeriodAndDate } from '../../../modules/attendance/attendance.repository.js';
 import { selectActivePeriod } from '../../../modules/periods/period.repository.js';
+import { buildReportUrl, createReportToken } from '../../../modules/reports/report-link-token.js';
 import type { CreateTaskDto } from '../../../modules/tasks/task.types.js';
 import { broadcastToLine } from '../client.js';
 import { env } from '../../../config/env.js';
@@ -62,7 +63,8 @@ export async function sendDailySummary(date: string, tasks: CreateTaskDto[]): Pr
     taskLines,
   ].join('\n');
 
-  const reportUrl = `${env.API_BASE_URL}/api/reports/daily?date=${date}`;
+  const token = createReportToken({ kind: 'daily', date });
+  const reportUrl = buildReportUrl(env.API_BASE_URL, token);
   const fullText = `${text}\n\n📄 รายงานประจำวัน\n${reportUrl}`;
 
   await broadcastToLine([{ type: 'text', text: fullText }]);

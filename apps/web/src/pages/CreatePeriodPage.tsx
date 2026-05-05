@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createPeriod, getActivePeriod } from '../api/period.api';
+import { createPeriod, getActivePeriod, getAllPeriods, type Period } from '../api/period.api';
 
 type FieldErrors = { start_date?: string; end_date?: string };
 
@@ -11,11 +11,13 @@ export function CreatePeriodPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
+  const [existingPeriods, setExistingPeriods] = useState<Period[]>([]);
 
   useEffect(() => {
-    getActivePeriod()
-      .then((period) => {
-        if (period) navigate('/attendance', { replace: true });
+    Promise.all([getActivePeriod(), getAllPeriods()])
+      .then(([active, all]) => {
+        if (active) navigate('/attendance', { replace: true });
+        setExistingPeriods(all);
       })
       .catch(() => {})
       .finally(() => setChecking(false));
@@ -35,6 +37,14 @@ export function CreatePeriodPage() {
     if (!form.end_date) errs.end_date = 'กรุณาเลือกวันที่สิ้นสุด';
     if (form.start_date && form.end_date && form.end_date < form.start_date) {
       errs.end_date = 'วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น';
+    }
+    if (form.start_date && form.end_date && !errs.start_date && !errs.end_date) {
+      const overlap = existingPeriods.find(
+        (p) => form.start_date <= p.end_date && form.end_date >= p.start_date,
+      );
+      if (overlap) {
+        errs.start_date = `ทับซ้อนกับงวด ${overlap.start_date} – ${overlap.end_date}`;
+      }
     }
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;

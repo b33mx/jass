@@ -18,8 +18,9 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_DB_SCHEMA: z.string().default('public'),
   WEB_BASE_URL: z.string().default('http://localhost:5173'),
-  API_BASE_URL: z.string().default('https://jass-r9vu.onrender.com'),
-  LIFF_ID:  z.string().default("2009908241-5ii7GhO0")
+  API_BASE_URL: z.string().default('https://buy-connectors-adding-measure.trycloudflare.com'),
+  LIFF_ID: z.string().default('2009908241-5ii7GhO0'),
+  REPORT_LINK_SECRET: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

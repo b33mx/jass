@@ -9,6 +9,8 @@ import { CreateTasksPage } from './pages/CreateTasksPage';
 import { EditEmployeePage } from './pages/EditEmployeePage';
 import { EditEmployeeSelectPage } from './pages/EditEmployeeSelectPage';
 import { HomePage } from './pages/HomePage';
+import { PayrollPage } from './pages/PayrollPage';
+import { PayrollPeriodPage } from './pages/PayrollPeriodPage';
 import { WorkReportPage } from './pages/WorkReportPage';
 
 export default function App() {
@@ -23,6 +25,8 @@ export default function App() {
         <Route path="/attendance" element={<AttendanceOverviewPage />} />
         <Route path="/attendance/log" element={<AttendancePage />} />
         <Route path="/reports/work" element={<WorkReportPage />} />
+        <Route path="/payroll" element={<PayrollPage />} />
+        <Route path="/payroll/period/:id" element={<PayrollPeriodPage />} />
         <Route path="/periods/new" element={<CreatePeriodPage />} />
         <Route path="/tasks/new" element={<CreateTasksPage />} />
       </Routes>

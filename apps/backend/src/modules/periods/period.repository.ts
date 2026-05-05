@@ -18,6 +18,19 @@ export async function selectActivePeriod(today: string): Promise<Period | null> 
   return (data as Period | null) ?? null;
 }
 
+export async function selectOverlappingPeriod(start: string, end: string): Promise<Period | null> {
+  const { data, error } = await supabase
+    .from('periods')
+    .select(PERIOD_FIELDS)
+    .lte('start_date', end)
+    .gte('end_date', start)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as Period | null) ?? null;
+}
+
 export async function insertPeriod(data: { start_date: string; end_date: string }): Promise<Period> {
   const { data: period, error } = await supabase
     .from('periods')
@@ -47,4 +60,16 @@ export async function selectPeriodById(id: number): Promise<Period | null> {
 
   if (error) throw new Error(error.message);
   return (data as Period | null) ?? null;
+}
+
+export async function closePeriodById(id: number): Promise<Period> {
+  const { data, error } = await supabase
+    .from('periods')
+    .update({ is_active: false })
+    .eq('period_id', id)
+    .select(PERIOD_FIELDS)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as Period;
 }
