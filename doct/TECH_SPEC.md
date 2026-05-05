@@ -1,7 +1,7 @@
 # JASS Payroll LINE OA — Technical Specification
 
-**Version:** 1.1  
-**Date:** 2026-04-28  
+**Version:** 1.2  
+**Date:** 2026-05-05  
 **Author:** Angela  
 **Related PRD:** PRD.md
 
@@ -45,7 +45,7 @@ LIFF (React + Vite)
     │ (3) User กด LIFF URL ใน LINE
     ▼
 Web App (React)
-    ├── Pages (Employee CRUD, Attendance, Period)
+    ├── Pages (Employee CRUD, AttendanceOverview /attendance, AttendancePage /attendance/log, Period, Tasks, WorkReport)
     └── POST/GET /api/* → Backend REST API
 ```
 
@@ -56,6 +56,8 @@ Web App (React)
 | employees | controller, service, repository, route | CRUD พนักงาน + คำนวณ ot_rate |
 | periods | controller, service, repository, route | สร้างงวด, หางวด active |
 | attendance | controller, service, repository, route | บันทึกเวลา, หาวันที่ขาด, upsert batch |
+| tasks | controller, service, repository, route, types | batch tasks + image upload + LINE summary |
+| reports | controller, route, service, work.service | PDF report generation (PDFKit + Sarabun) |
 
 ---
 
@@ -100,12 +102,25 @@ erDiagram
         date task_date
         text task "ชื่องาน"
         text detail "รายละเอียด (nullable)"
+        text start_time "nullable"
+        text end_time "nullable"
         text employee_ids "comma-separated employee_id"
+        timestamptz created_at
+    }
+
+    TASK_IMAGES {
+        int image_id PK
+        int task_id FK
+        text file_name
+        text public_url
+        text storage_path
+        int module
         timestamptz created_at
     }
 
     EMPLOYEES ||--o{ ATTENDANCE : "has"
     PERIODS ||--o{ ATTENDANCE : "contains"
+    TASKS ||--o{ TASK_IMAGES : "has"
 ```
 
 ### 3.2 SQL Schema
@@ -152,7 +167,20 @@ create table tasks (
   task_date     date        not null,
   task          text        not null,
   detail        text,
+  start_time    text,
+  end_time      text,
   employee_ids  text        not null,
+  created_at    timestamptz not null default now()
+);
+
+-- task_images
+create table task_images (
+  image_id      int generated always as identity primary key,
+  task_id       int         not null references tasks(task_id) on delete cascade,
+  file_name     text        not null,
+  public_url    text        not null,
+  storage_path  text        not null,
+  module        int         not null default 0,
   created_at    timestamptz not null default now()
 );
 ```
@@ -177,11 +205,20 @@ create table tasks (
 | GET | `/api/employees/:id` | ดูพนักงาน 1 คน |
 | PATCH | `/api/employees/:id` | แก้ไขข้อมูลพนักงาน |
 | DELETE | `/api/employees/:id` | deactivate พนักงาน |
+| GET | `/api/periods` | ดูงวดทั้งหมด → `Period[]` |
 | GET | `/api/periods/active` | หางวดที่ active ณ วันนี้ → `{ period: Period \| null }` |
 | POST | `/api/periods` | สร้างงวดใหม่ `{ start_date, end_date }` |
 | GET | `/api/attendance/missing-dates?period_id=X` | วันที่ในงวดที่ยังไม่มีข้อมูล attendance → `string[]` |
 | GET | `/api/attendance?period_id=X&date=Y` | ดู attendance ของวันที่ระบุในงวด → `Attendance[]` |
 | POST | `/api/attendance/batch` | upsert attendance ทุกพนักงานสำหรับวันที่ระบุ |
+| GET | `/api/tasks?date=Y` | ดูงานทั้งหมดของวันที่ระบุ (พร้อม images) |
+| POST | `/api/tasks` | batch create tasks + images + trigger LINE summary |
+| PUT | `/api/tasks` | replace tasks ทั้งหมดของวันที่ระบุ |
+| POST | `/api/tasks/summary` | trigger LINE daily summary manually |
+| POST | `/api/tasks/images` | upload รูปภาพงาน (multipart, max 5) → Supabase Storage |
+| GET | `/api/reports/work?date=Y` | PDF work report ของงวดที่ date อยู่ |
+| GET | `/api/reports/work/current` | PDF work report งวดปัจจุบัน |
+| GET | `/api/reports/daily?date=Y` | PDF daily summary |
 | GET | `/health` | Health check |
 | POST | `/webhook/line` | LINE webhook |
 

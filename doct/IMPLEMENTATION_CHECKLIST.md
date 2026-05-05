@@ -22,7 +22,7 @@
 
 ---
 
-## Phase 1 — Employee + Attendance MVP
+## Phase 1 — Employee + Attendance MVP ✅ Complete
 
 ### Employee Feature ✅ Complete
 
@@ -125,22 +125,57 @@
 
 ### Tasks Feature ✅ Complete
 
-#### [x] Tasks Repository + Service + Routes
-- `POST /api/tasks` — รับ `{ tasks: [...] }` batch insert
-- `employee_ids` เก็บเป็น comma-separated string (e.g. `"1,3,5"`)
-- หลัง save → fire-and-forget `sendDailySummary` (LINE broadcast)
+#### [x] Task Model
+- `tasks` table: `task_id`, `task_date`, `task`, `detail`, `start_time`, `end_time`, `employee_ids`
+- `task_images` table: `image_id`, `task_id`, `file_name`, `public_url`, `storage_path`, `module`
+
+#### [x] Tasks Repository
+- `insertTasks(records[])` — batch insert
+- `insertTaskImages(records[])` — insert images linked to task_id
+- `getTasksByDate(date)` — query พร้อม join `task_images`
+- `getTasksByDateRange(start, end)` — ใช้ใน report
+- `deleteTasksByDate(date)` — ใช้กับ PUT (replace)
+
+#### [x] Tasks Routes
+- `GET /api/tasks?date=YYYY-MM-DD` — ดูงานตามวัน (พร้อม images)
+- `POST /api/tasks` — batch create tasks + images + trigger LINE summary
+- `PUT /api/tasks` — delete ทั้งหมดของวันนั้นแล้ว insert ใหม่ (idempotent replace)
+- `POST /api/tasks/summary` — trigger LINE summary manually
+- `POST /api/tasks/images` — upload รูป (multipart, max 5) → Supabase Storage → return `{ public_url, storage_path, file_name }`
 
 #### [x] LIFF: CreateTasksPage
 - Route: `/tasks/new`
 - รับ state `{ date, employees, period, remainingCount }` จาก AttendancePage
-- แสดงรายการงาน (เพิ่มได้เรื่อยๆ): ชื่องาน*, ดีเทล, พนักงาน (multi-select dropdown)
+- แสดงรายการงาน (เพิ่มได้เรื่อยๆ): ชื่องาน*, ดีเทล, start_time, end_time, พนักงาน (multi-select dropdown), รูปภาพ
+- Image upload: compress ก่อน (`compressImage.ts`) → `POST /api/tasks/images` → เก็บ URL
 - Submit → `POST /api/tasks` → success view
   - ยังเหลือวัน → "บันทึกสำเร็จ | เหลืออีก X วัน" + ปุ่ม "ลงเวลาวันถัดไป" → `/attendance`
   - ครบทุกวัน → "ลงเวลาครบทุกวันแล้ว!" + ปุ่ม "กลับหน้าหลัก" → `/`
 
 #### [x] LINE: Daily Summary Broadcast
-- `sendDailySummary(date, tasks)` — ส่ง broadcast หลัง save tasks
+- `sendDailySummary(date, tasks)` — fire-and-forget หลัง save tasks
 - ข้อความ: สรุปการทำงานวันที่, มาทำงาน/ขาด, รายการงาน + ผู้รับผิดชอบ
+
+---
+
+### Reports Feature ✅ Complete (implement เร็วกว่า Phase 3)
+
+#### [x] Report Service: generateWorkReport(date)
+- เรียก `selectActivePeriod(date)` → ถ้าไม่มีงวด throw error
+- ดึง attendance, employees, tasks แบบ parallel
+- สร้าง PDF 3 หน้า A4 landscape ด้วย PDFKit + Sarabun font:
+  - หน้า 1: ตารางการเข้างานรายคน (วัน × พนักงาน) + รวมแรงงาน + OT
+  - หน้า 2: ตาราง OT รายวันรายคน + OT รวม
+  - หน้า 3: รายการงาน (วันที่ | งาน + detail | ผู้รับผิดชอบ)
+
+#### [x] Report Routes
+- `GET /api/reports/work?date=YYYY-MM-DD` — work report PDF ของงวดที่ date อยู่
+- `GET /api/reports/work/current` — work report งวดปัจจุบัน (TZ-aware ใช้ `env.TZ`)
+- `GET /api/reports/daily?date=YYYY-MM-DD` — daily summary PDF
+
+#### [x] LIFF: WorkReportPage
+- Route: `/report/work`
+- Date picker (default = วันนี้) → ลิงก์ download `GET /api/reports/work?date=`
 
 ---
 

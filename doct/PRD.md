@@ -1,9 +1,9 @@
 # JASS Payroll LINE OA — Product Requirements Document
 
-**Version:** 1.1  
-**Date:** 2026-04-28  
+**Version:** 1.2  
+**Date:** 2026-05-05  
 **Owner:** Angela (Full Stack Developer)  
-**Status:** Phase 1 in progress
+**Status:** Phase 2 starting
 
 ---
 
@@ -133,11 +133,24 @@ gross = (จำนวนวันที่ morning_check หรือ afternoon_
 
 **LINE handler:** `>คำนวณ` → เลือกงวด → reply Flex สรุปยอดรายคน
 
-### 5.5 Feature: รายงาน 🔲 Phase 3
+### 5.5 Feature: บันทึกรายการงาน ✅ Done
 
-- สรุปการเข้างานรายพนักงาน แยกตามงวด
-- ยอดเงินเดือนภาพรวมทั้งงวด
-- LINE handler: `>รายงาน`
+- เสมียนบันทึกงานรายวัน (ชื่องาน, ดีเทล, เวลาเริ่ม/จบ, พนักงานรับผิดชอบ, รูปภาพ)
+- `POST /api/tasks` → บันทึก + LINE broadcast สรุปวันนี้อัตโนมัติ
+- `PUT /api/tasks` → แก้ไขงานของวันที่ระบุ (replace)
+- `POST /api/tasks/images` → upload รูปงาน → Supabase Storage
+- LIFF: CreateTasksPage — batch entry พร้อม image upload
+
+### 5.6 Feature: รายงานการทำงาน (PDF) ✅ Done
+
+- ดาวน์โหลด PDF รายงานการทำงานของงวด: attendance summary, OT summary, task list
+- `GET /api/reports/work?date=` หรือ `/api/reports/work/current`
+- LIFF: WorkReportPage — date picker + ปุ่ม download
+
+### 5.7 Feature: คำนวณเงินเดือน 🔲 Phase 2
+
+- สรุปยอดเงินเดือนรายคนตามงวด
+- LINE handler: `>คำนวณ` → เลือกงวด → reply Flex สรุปยอด
 
 ---
 
@@ -166,7 +179,7 @@ gross = (จำนวนวันที่ morning_check หรือ afternoon_
 | Phase | Description | Status |
 |-------|-------------|--------|
 | Phase 0 — Foundation | DB Schema, Supabase setup, scaffold | ✅ Done |
-| Phase 1 — MVP Core | Employee CRUD + Attendance logging via LIFF | 🔄 In Progress |
-| Phase 2 — Payroll | Period lock + calculation engine + report | 🔲 Next |
-| Phase 3 — Polish | Tasks feature, report, LINE auth, error UX | 🔲 Planned |
+| Phase 1 — MVP Core | Employee CRUD + Attendance + Tasks + PDF Report | ✅ Done |
+| Phase 2 — Payroll | Period lock + calculation engine | 🔄 In Progress |
+| Phase 3 — Polish | LINE auth, error UX | 🔲 Planned |
 | Phase 4 — Deploy | Production deploy, LINE OA config, UAT | 🔲 Planned |

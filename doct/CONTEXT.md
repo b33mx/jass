@@ -1,6 +1,6 @@
 # JASS Payroll LINE OA — Project Context
 
-> Last updated: 2026-04-28 | Phase: Phase 1 — Employee + Attendance MVP (in progress)
+> Last updated: 2026-05-05 | Phase: Phase 2 — Payroll Core (starting)
 
 ## What we're building
 
@@ -42,11 +42,11 @@
 - tasks table ใช้ `employee_ids text` (comma-separated) — ใช้แทน work_logs ในการบันทึกงาน
 - Role management (`line_users` table) ยังไม่ implement ใน v1 (เพิ่มใน Phase 3)
 - ไม่ทำ multi-tenant ใน v1
-- ไม่ทำ PDF export ใน v1
+- PDF report export ใช้ PDFKit + Sarabun font — implement แล้วใน Phase 1 (ก่อน schedule เดิม)
 
 ## Current Phase
 
-**Phase 1 — Employee + Attendance MVP** (in progress)
+**Phase 2 — Payroll Core** (starting)
 
 ## What's done ✅
 
@@ -72,26 +72,39 @@
 - [x] LIFF: EditEmployeePage (`/employees/:id/edit`) + delete
 
 ### Attendance / Period Feature
-- [x] Period repository (selectActive, insert, selectById)
-- [x] Period service + controller + routes (`/api/periods/active`, `POST /api/periods`)
+- [x] Period repository (selectActive, insert, selectById, selectAll)
+- [x] Period service + controller + routes (`GET /api/periods`, `GET /api/periods/active`, `POST /api/periods`)
 - [x] Attendance repository (missingDates, byPeriodAndDate, upsertBatch)
 - [x] Attendance service + controller + routes (`/api/attendance/missing-dates`, `GET /api/attendance`, `POST /api/attendance/batch`)
 - [x] LINE handler: `>ลงเวลา` → Flex message พร้อม LIFF URL
-- [x] LIFF: AttendancePage (`/attendance`) — period check, dropdown วันที่ขาด, table + submit
+- [x] LIFF: AttendanceOverviewPage (`/attendance`) — แสดงทุกงวด + วันที่ยังไม่ได้ลง → navigate to log form
+- [x] LIFF: AttendancePage (`/attendance/log`) — ฟอร์มลงเวลารายวัน (เช้า/บ่าย/OT)
 - [x] LIFF: CreatePeriodPage (`/periods/new`) — form สร้างงวด
+
+### Tasks Feature
+- [x] Task model: `task_id`, `task_date`, `task`, `detail`, `start_time`, `end_time`, `employee_ids`
+- [x] Task images model: `task_images` table (`image_id`, `task_id`, `file_name`, `public_url`, `storage_path`, `module`)
+- [x] Task repository: `insertTasks`, `insertTaskImages`, `getTasksByDate`, `getTasksByDateRange`, `deleteTasksByDate`
+- [x] Task routes: `GET /api/tasks?date=`, `POST /api/tasks`, `PUT /api/tasks`, `POST /api/tasks/summary`, `POST /api/tasks/images`
+- [x] LIFF: CreateTasksPage (`/tasks/new`) — batch task entry + image upload per task + success state
+- [x] LINE: Daily Summary Broadcast (`sendDailySummary`) หลัง save tasks
+
+### Reports Feature
+- [x] `GET /api/reports/work?date=YYYY-MM-DD` — PDF 3 หน้า A4 landscape: attendance summary, OT summary, task list
+- [x] `GET /api/reports/work/current` — work report ของ active period ณ วันนี้ (TZ-aware)
+- [x] `GET /api/reports/daily?date=YYYY-MM-DD` — daily summary PDF
+- [x] LIFF: WorkReportPage (`/report/work`) — date picker + ปุ่ม download PDF
+- [x] PDFKit + Sarabun font (Regular + Bold) สำหรับ Thai text
 
 ## What's next
 
-### Phase 1 — เหลือ
-- [ ] Tasks feature: บันทึกรายการงานรายวัน (ยังไม่มี API หรือ LIFF)
-
 ### Phase 2 — Payroll Core
+- [ ] `PATCH /api/periods/:id` — ปิดงวด (is_active = false)
 - [ ] Payroll calculation engine (gross = วันทำงาน × wage + OT × ot_rate)
-- [ ] Calculate endpoint + LINE handler `>คำนวณ`
-- [ ] Period lock (is_active = false เมื่อสรุปเสร็จ)
+- [ ] `POST /api/periods/:id/calculate` + `GET /api/periods/:id/results`
+- [ ] LINE handler `>คำนวณ` → เลือกงวด → reply Flex สรุปยอด
 
-### Phase 3 — Polish & Report
-- [ ] Report: สรุปเวลา/เงินเดือนรายงวด
-- [ ] LINE handler `>รายงาน`
+### Phase 3 — Polish
 - [ ] LINE auth (line_users table + role guard)
-- [ ] Error handling UX polish
+- [ ] Wire LINE signature verification เป็น middleware จริง
+- [ ] Error handling UX polish (reply ภาษาไทย + help message)
