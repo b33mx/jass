@@ -172,11 +172,14 @@ export function CreateTasksPage() {
   const navigate = useNavigate();
   const { state } = useLocation() as { state: LocationState | null };
 
-  const [entries, setEntries] = useState<TaskEntry[]>([emptyEntry()]);
+  const [entries, setEntries] = useState<TaskEntry[]>(() =>
+    state?.employees?.length === 0 ? [] : [emptyEntry()]
+  );
   const [submitting, setSubmitting] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
 
   useEffect(() => {
     if (!state?.date) navigate('/attendance', { replace: true });
@@ -233,6 +236,14 @@ export function CreateTasksPage() {
   }
 
   function validate(): boolean {
+    if (entries.length === 0) {
+      if (employees.length > 0) {
+        setError('ต้องบันทึกงานอย่างน้อย 1 รายการ สำหรับวันที่มีพนักงานมาทำงาน');
+        return false;
+      }
+      return true;
+    }
+    setError(null);
     let valid = true;
     setEntries((prev) =>
       prev.map((e) => {
@@ -251,6 +262,13 @@ export function CreateTasksPage() {
     setSubmitting(true);
     setError(null);
     try {
+      if (entries.length === 0) {
+        triggerDailySummary(date).catch((err) => {
+          console.error('[tasks] triggerDailySummary failed:', err);
+        });
+        setSaved(true);
+        return;
+      }
       const uploadedImages = await Promise.all(
         entries.map((e) => (e.newImages.length > 0 ? uploadTaskImages(e.newImages, period.start_date) : Promise.resolve([])))
       );
@@ -356,34 +374,90 @@ export function CreateTasksPage() {
       <div className="overflow-hidden rounded-3xl shadow-lg shadow-zinc-200/80">
 
         {/* Header */}
-        <div className="relative bg-brandRed px-6 pb-10 pt-6">
+        <div className="relative bg-brandRed px-6 pb-10 pt-5">
           <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
           <div className="absolute -right-2 top-10 h-16 w-16 rounded-full bg-white/5" />
-          <div className="relative flex items-center gap-4 mt-2">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-              <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                if (employees.length > 0) {
+                  setShowBackConfirm(true);
+                } else {
+                  navigate(-1);
+                }
+              }}
+              className="mb-3 flex items-center gap-1 text-sm text-white/70 transition hover:text-white"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">บันทึกงาน</h1>
-              <p className="mt-0.5 text-sm text-white/60">{formatThaiDate(date)}</p>
+              ลงเวลา
+            </button>
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+                <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">บันทึกงาน</h1>
+                <p className="mt-0.5 text-sm text-white/60">{formatThaiDate(date)}</p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Body */}
         <div className="-mt-5 rounded-t-3xl bg-white px-4 pb-6 pt-6">
-          <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
-            รายการงาน
-          </p>
+
+          {/* No-employees info banner */}
+          {employees.length === 0 && (
+            <div className="mb-4 flex items-start gap-3 rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-200">
+              <svg className="mt-0.5 h-5 w-5 shrink-0 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-sky-800">วันนี้ไม่มีพนักงานมาทำงาน</p>
+                <p className="mt-0.5 text-xs text-sky-600">ไม่จำเป็นต้องบันทึกงาน — กด "บันทึก" เพื่อดำเนินการต่อได้เลย</p>
+                {entries.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setEntries([])}
+                    className="mt-1.5 text-xs font-semibold text-sky-600 underline underline-offset-2 hover:text-sky-800"
+                  >
+                    ลบงานทั้งหมด
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Has-employees but no tasks warning */}
+          {employees.length > 0 && entries.length === 0 && (
+            <div className="mb-4 flex items-start gap-3 rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-200">
+              <svg className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">ต้องบันทึกงานอย่างน้อย 1 รายการ</p>
+                <p className="mt-0.5 text-xs text-amber-600">วันที่มีพนักงานมาทำงาน ต้องมีงานที่ทำอย่างน้อย 1 งาน</p>
+              </div>
+            </div>
+          )}
+
+          {(entries.length > 0 || employees.length > 0) && (
+            <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+              รายการงาน
+            </p>
+          )}
 
           <div className="flex flex-col gap-3">
             {entries.map((entry, i) => (
               <div key={i} className="rounded-2xl bg-zinc-50 px-4 py-4 ring-1 ring-zinc-100">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-xs font-semibold text-zinc-500">งาน {i + 1}</span>
-                  {entries.length > 1 && (
+                  {(entries.length > 1 || employees.length === 0) && (
                     <button
                       type="button"
                       onClick={() => removeEntry(i)}
@@ -422,25 +496,26 @@ export function CreateTasksPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="min-w-0">
-                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">เวลาเริ่ม</label>
+                  <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                    <label className="flex items-center gap-3 px-3 py-2.5">
+                      <span className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">เริ่มต้น</span>
                       <input
                         type="time"
                         value={entry.startTime}
                         onChange={(e) => updateEntry(i, { startTime: e.target.value })}
-                        className="block h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium outline-none transition focus:border-brandRed focus:ring-2 focus:ring-brandRed/10"
+                        className="flex-1 bg-transparent text-sm font-medium text-zinc-800 outline-none"
                       />
-                    </div>
-                    <div className="min-w-0">
-                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">เวลาสิ้นสุด</label>
+                    </label>
+                    <div className="mx-3 border-t border-zinc-100" />
+                    <label className="flex items-center gap-3 px-3 py-2.5">
+                      <span className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">สิ้นสุด</span>
                       <input
                         type="time"
                         value={entry.endTime}
                         onChange={(e) => updateEntry(i, { endTime: e.target.value })}
-                        className="block h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium outline-none transition focus:border-brandRed focus:ring-2 focus:ring-brandRed/10"
+                        className="flex-1 bg-transparent text-sm font-medium text-zinc-800 outline-none"
                       />
-                    </div>
+                    </label>
                   </div>
 
                   <div>
@@ -561,7 +636,7 @@ export function CreateTasksPage() {
             disabled={submitting}
             className="mt-4 w-full rounded-2xl bg-brandRed py-4 text-sm font-bold tracking-wide text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? 'กำลังบันทึก...' : 'บันทึกงาน'}
+            {submitting ? 'กำลังบันทึก...' : employees.length === 0 && entries.length === 0 ? 'บันทึก' : 'บันทึกงาน'}
           </button>
 
           <button
@@ -576,6 +651,47 @@ export function CreateTasksPage() {
           >
             ข้ามขั้นตอนนี้
           </button>
+
+          {/* Back confirmation overlay */}
+          {showBackConfirm && (
+            <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-6">
+              <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+                <div className="px-6 pb-2 pt-6">
+                  <div className="mb-1 flex items-center gap-2">
+                    <svg className="h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-base font-bold text-zinc-800">ยังไม่ได้บันทึกงาน</p>
+                  </div>
+                  <p className="mt-1 text-sm leading-relaxed text-zinc-500">
+                    วันนี้มีพนักงานมาทำงาน แต่ยังไม่ได้บันทึกรายละเอียดงาน
+                    หากออกโดยไม่บันทึก วันนี้จะไม่มีงานบันทึกไว้
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 px-6 pb-6 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowBackConfirm(false)}
+                    className="w-full rounded-2xl bg-brandRed py-3.5 text-sm font-bold text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 active:scale-[0.98]"
+                  >
+                    อยู่ต่อ — บันทึกงาน
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerDailySummary(date).catch((err) => {
+                        console.error('[tasks] triggerDailySummary failed:', err);
+                      });
+                      navigate('/attendance');
+                    }}
+                    className="w-full rounded-2xl py-3 text-sm font-medium text-zinc-400 transition hover:text-zinc-600"
+                  >
+                    ออกโดยไม่บันทึกงาน
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-create table task_images (
+create table if not exists task_images (
   image_id     int generated always as identity primary key,
   task_id      int not null references tasks(task_id) on delete cascade,
   file_name    text not null,
