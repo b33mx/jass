@@ -8,7 +8,10 @@ function eachDayInRange(start: string, end: string): string[] {
   const cur = new Date(start + 'T00:00:00');
   const last = new Date(end + 'T00:00:00');
   while (cur <= last) {
-    dates.push(cur.toISOString().slice(0, 10));
+    const y = cur.getFullYear();
+    const mo = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    dates.push(`${y}-${mo}-${d}`);
     cur.setDate(cur.getDate() + 1);
   }
   return dates;
@@ -60,7 +63,8 @@ function StatusBadge({ status }: { status: DateStatus }) {
 
 export function AttendanceOverviewPage() {
   const navigate = useNavigate();
-  const today = new Date().toISOString().slice(0, 10);
+  const todayDate = new Date();
+  const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
 
   const [loading, setLoading] = useState(true);
   const [periods, setPeriods] = useState<Period[]>([]);

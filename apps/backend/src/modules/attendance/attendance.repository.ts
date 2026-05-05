@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabase.js';
 import type { Attendance } from './attendance.types.js';
 
-const ATTENDANCE_FIELDS = 'attendance_id, attendance_date, employee_id, period_id, morning_check, afternoon_check, ot, created_at';
+const ATTENDANCE_FIELDS = 'attendance_id, attendance_date, employee_id, period_id, morning_check, afternoon_check, ot, leave_reason, created_at';
 
 export async function selectAttendanceByPeriodAndDate(periodId: number, date: string): Promise<Attendance[]> {
   const { data, error } = await supabase
@@ -43,6 +43,7 @@ export async function upsertAttendanceBatch(
     morning_check: boolean;
     afternoon_check: boolean;
     ot: number;
+    leave_reason: string | null;
   }>
 ): Promise<Attendance[]> {
   const { data, error } = await supabase

@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getAttendanceForDate, getMissingDates, saveAttendanceBatch } from '../api/attendance.api';
 import { getAllEmployees } from '../api/employee.api';
 import { getActivePeriod, type Period } from '../api/period.api';
-import { triggerDailySummary } from '../api/task.api';
 
 function NoPeriodState() {
   const navigate = useNavigate();
@@ -59,6 +58,7 @@ interface AttendanceRow {
   afternoon_check: boolean;
   ot_time: string;
   is_holiday: boolean;
+  leave_reason: string;
   rowError?: boolean;
 }
 
@@ -131,6 +131,7 @@ export function AttendancePage() {
                 afternoon_check: att?.afternoon_check ?? false,
                 ot_time: att ? decimalToOtTime(att.ot) : '00:00',
                 is_holiday: att ? (!att.morning_check && !att.afternoon_check && att.ot === 0) : false,
+                leave_reason: att?.leave_reason ?? '',
               };
             }));
           } finally {
@@ -172,7 +173,8 @@ export function AttendancePage() {
             morning_check: att?.morning_check ?? false,
             afternoon_check: att?.afternoon_check ?? false,
             ot_time: att ? decimalToOtTime(att.ot) : '00:00',
-            is_holiday: false,
+            is_holiday: att ? (!att.morning_check && !att.afternoon_check && att.ot === 0) : false,
+            leave_reason: att?.leave_reason ?? '',
           };
         })
       );
@@ -205,11 +207,16 @@ export function AttendancePage() {
               morning_check: false,
               afternoon_check: false,
               ot_time: '00:00',
+              leave_reason: r.is_holiday ? '' : r.leave_reason,
               rowError: false,
             }
           : r
       )
     );
+  }
+
+  function handleLeaveReasonChange(index: number, value: string) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, leave_reason: value } : r)));
   }
 
   function handleOtTimeChange(index: number, value: string) {
@@ -241,24 +248,13 @@ export function AttendancePage() {
           morning_check: r.is_holiday ? false : r.morning_check,
           afternoon_check: r.is_holiday ? false : r.afternoon_check,
           ot: r.is_holiday ? 0 : otTimeToDecimal(r.ot_time),
+          leave_reason: r.is_holiday && r.leave_reason ? r.leave_reason : undefined,
         })),
       });
       const checkedIn = rows
         .filter((r) => r.morning_check || r.afternoon_check)
         .map((r) => ({ employee_id: r.employee_id, name: r.name }));
       const remaining = missingDates.filter((d) => d !== selectedDate);
-
-      if (checkedIn.length === 0) {
-        triggerDailySummary(selectedDate).catch((err) => {
-          console.error('[attendance] triggerDailySummary failed:', err);
-        });
-        if (remaining.length === 0) {
-          navigate('/');
-        } else {
-          navigate('/attendance');
-        }
-        return;
-      }
 
       navigate('/tasks/new', {
         state: {
@@ -294,20 +290,32 @@ export function AttendancePage() {
       <div className="overflow-hidden rounded-3xl shadow-lg shadow-zinc-200/80">
 
         {/* Header */}
-        <div className="relative bg-brandRed px-6 pb-10 pt-6">
+        <div className="relative bg-brandRed px-6 pb-10 pt-5">
           <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
           <div className="absolute -right-2 top-10 h-16 w-16 rounded-full bg-white/5" />
-          <div className="relative flex items-center gap-4 mt-2">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-              <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="mb-3 flex items-center gap-1 text-sm text-white/70 transition hover:text-white"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">ลงเวลางาน</h1>
-              <p className="mt-0.5 text-sm text-white/70">
-                งวด {formatThaiDate(period.start_date)} – {formatThaiDate(period.end_date)}
-              </p>
+              กลับ
+            </button>
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+                <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">ลงเวลางาน</h1>
+                <p className="mt-0.5 text-sm text-white/70">
+                  งวด {formatThaiDate(period.start_date)} – {formatThaiDate(period.end_date)}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -380,52 +388,65 @@ export function AttendancePage() {
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
                       {rows.map((row, i) => (
-                        <tr
-                          key={row.employee_id}
-                          className={row.rowError ? 'bg-red-50' : row.is_holiday ? 'bg-amber-50/60' : 'bg-white'}
-                        >
-                          <td className="px-4 py-3 font-medium text-zinc-800">
-                            <div>{row.name}</div>
-                            {row.rowError && (
-                              <p className="mt-0.5 text-[11px] text-red-500">เลือกอย่างน้อย 1 ตัวเลือก</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={row.is_holiday}
-                              onChange={() => toggleHoliday(i)}
-                              className="h-5 w-5 cursor-pointer accent-amber-500"
-                            />
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={row.morning_check}
-                              disabled={row.is_holiday}
-                              onChange={() => toggleCheck(i, 'morning_check')}
-                              className="h-5 w-5 cursor-pointer accent-brandRed disabled:cursor-not-allowed disabled:opacity-30"
-                            />
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={row.afternoon_check}
-                              disabled={row.is_holiday}
-                              onChange={() => toggleCheck(i, 'afternoon_check')}
-                              className="h-5 w-5 cursor-pointer accent-brandRed disabled:cursor-not-allowed disabled:opacity-30"
-                            />
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            <input
-                              type="time"
-                              value={row.ot_time}
-                              disabled={row.is_holiday}
-                              onChange={(e) => handleOtTimeChange(i, e.target.value)}
-                              className="w-24 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-center text-sm outline-none focus:border-brandRed focus:ring-1 focus:ring-brandRed/20 disabled:cursor-not-allowed disabled:opacity-30"
-                            />
-                          </td>
-                        </tr>
+                        <Fragment key={row.employee_id}>
+                          <tr className={row.rowError ? 'bg-red-50' : row.is_holiday ? 'bg-amber-50/60' : 'bg-white'}>
+                            <td className="px-4 py-3 font-medium text-zinc-800">
+                              <div>{row.name}</div>
+                              {row.rowError && (
+                                <p className="mt-0.5 text-[11px] text-red-500">เลือกอย่างน้อย 1 ตัวเลือก</p>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={row.is_holiday}
+                                onChange={() => toggleHoliday(i)}
+                                className="h-5 w-5 cursor-pointer accent-amber-500"
+                              />
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={row.morning_check}
+                                disabled={row.is_holiday}
+                                onChange={() => toggleCheck(i, 'morning_check')}
+                                className="h-5 w-5 cursor-pointer accent-brandRed disabled:cursor-not-allowed disabled:opacity-30"
+                              />
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={row.afternoon_check}
+                                disabled={row.is_holiday}
+                                onChange={() => toggleCheck(i, 'afternoon_check')}
+                                className="h-5 w-5 cursor-pointer accent-brandRed disabled:cursor-not-allowed disabled:opacity-30"
+                              />
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              <input
+                                type="time"
+                                value={row.ot_time}
+                                disabled={row.is_holiday}
+                                onChange={(e) => handleOtTimeChange(i, e.target.value)}
+                                className="w-24 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-center text-sm outline-none focus:border-brandRed focus:ring-1 focus:ring-brandRed/20 disabled:cursor-not-allowed disabled:opacity-30"
+                              />
+                            </td>
+                          </tr>
+                          {row.is_holiday && (
+                            <tr className="bg-amber-50/40">
+                              <td colSpan={5} className="px-4 pb-3 pt-1">
+                                <input
+                                  type="text"
+                                  placeholder="ระบุเหตุผลการหยุด (ไม่บังคับ)"
+                                  value={row.leave_reason}
+                                  onChange={(e) => handleLeaveReasonChange(i, e.target.value)}
+                                  maxLength={200}
+                                  className="w-full rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm text-zinc-700 outline-none placeholder:text-zinc-400 focus:border-amber-400 focus:ring-1 focus:ring-amber-200"
+                                />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>

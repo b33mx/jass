@@ -34,6 +34,7 @@ export async function saveAttendanceBatch(dto: BatchAttendanceDto): Promise<Atte
     morning_check: r.morning_check ?? false,
     afternoon_check: r.afternoon_check ?? false,
     ot: r.ot ?? 0,
+    leave_reason: r.leave_reason ?? null,
   }));
   return upsertAttendanceBatch(records);
 }

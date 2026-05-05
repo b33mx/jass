@@ -71,7 +71,7 @@ function pageBreak(doc: PDFKit.PDFDocument, y: number, need: number): number {
 function sectionHeader(doc: PDFKit.PDFDocument, title: string, y: number): number {
   y = pageBreak(doc, y, 36);
   doc.fillColor(C.section).rect(M, y, 4, 17).fill();
-  doc.font('Bold').fontSize(11).fillColor(C.text).text(title, M + 10, y + 2);
+  doc.font('Bold').fontSize(13).fillColor(C.text).text(title, M + 10, y + 2);
   return y + 28;
 }
 
@@ -121,7 +121,7 @@ function drawTable(
     });
 
     if (row.sub) {
-      doc.font('Regular').fontSize(8).fillColor(C.muted)
+      doc.font('Regular').fontSize(10).fillColor(C.muted)
         .text(row.sub, M + PAD + 10, y + ROW_H, { width: cols[0] - PAD * 2 - 10, lineBreak: false });
     }
 
@@ -156,9 +156,9 @@ export async function generateDailyReport(date: string): Promise<Buffer> {
 
     // ── Page header ──────────────────────────────────────────────
     doc.fillColor(C.pageHdr).rect(0, 0, 595.28, 82).fill();
-    doc.font('Bold').fontSize(15).fillColor('white')
+    doc.font('Bold').fontSize(18).fillColor('white')
       .text('รายงานสรุปการทำงานประจำวัน', M, 18, { width: CW });
-    doc.font('Regular').fontSize(10).fillColor('rgba(255,255,255,0.65)')
+    doc.font('Regular').fontSize(12).fillColor('rgba(255,255,255,0.65)')
       .text(thaiDate(date), M, 42);
     if (period) {
       doc.text(`งวด: ${shortDate(period.start_date)} – ${shortDate(period.end_date)}`, M, 57);
@@ -191,9 +191,34 @@ export async function generateDailyReport(date: string): Promise<Buffer> {
     const present = attendance.filter((a) => a.morning_check || a.afternoon_check).length;
     const absent = employees.length - present;
     y += 8;
-    doc.font('Regular').fontSize(9).fillColor(C.muted)
+    doc.font('Regular').fontSize(11).fillColor(C.muted)
       .text(`มาทำงาน  ${present}  คน   |   หยุดงาน  ${absent}  คน`, M + 6, y);
-    y += 28;
+    y += 14;
+
+    // Leave reason summary below attendance table
+    const leaveReasons = employees
+      .map((emp) => {
+        const att = attendance.find((a) => a.employee_id === emp.employee_id);
+        if (!att || att.morning_check || att.afternoon_check || !att.leave_reason) return null;
+        return { name: `${emp.first_name} ${emp.last_name}`, reason: att.leave_reason };
+      })
+      .filter((r): r is { name: string; reason: string } => r !== null);
+
+    if (leaveReasons.length > 0) {
+      y += 4;
+      y = pageBreak(doc, y, 20);
+      doc.font('Bold').fontSize(11).fillColor(C.section).text('หมายเหตุวันหยุด:', M + 6, y);
+      y += 14;
+      leaveReasons.forEach((lr) => {
+        y = pageBreak(doc, y, 13);
+        doc.font('Regular').fontSize(11).fillColor(C.muted)
+          .text(`${lr.name}  –  ${lr.reason}`, M + 14, y, { lineBreak: false });
+        y += 13;
+      });
+      y += 6;
+    } else {
+      y += 14;
+    }
 
     // ── Section 2: Tasks ─────────────────────────────────────────
     y = sectionHeader(doc, 'งานที่ทำวันนี้', y);
@@ -223,7 +248,7 @@ export async function generateDailyReport(date: string): Promise<Buffer> {
 
       for (const task of tasksWithImgs) {
         y = pageBreak(doc, y, 20);
-        doc.font('Bold').fontSize(9).fillColor(C.text).text(task.task, M, y);
+        doc.font('Bold').fontSize(11).fillColor(C.text).text(task.task, M, y);
         y += 18;
 
         const buffers = await Promise.all(task.images.map((img) => fetchBuffer(img.public_url)));

@@ -27,6 +27,10 @@
 - Controller layer = รู้จัก HTTP req/res, เรียก service, return JSON
 - Handler layer = รู้จัก LINE event, เรียก service, build Flex message
 - Timezone: บันทึก UTC ใน DB, แสดงผล Asia/Bangkok (UTC+7)
+- **Date string formatting (critical):** ห้ามใช้ `new Date(str).toISOString().slice(0,10)` เพื่อสร้าง `YYYY-MM-DD` string — เพราะถ้า Date object ถูกสร้างด้วย local time (เช่น `new Date(str + 'T00:00:00')`) แล้วแปลงด้วย `toISOString()` จะได้วันที่ผิด 1 วันใน UTC+7
+  - ✅ ถูก: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  - ✅ ถูก: `new Date(isoDateOnlyStr)` (parse date-only string = UTC) + `toISOString()` (backend: `attendance.service.ts`)
+  - ❌ ผิด: `new Date(str + 'T00:00:00').toISOString().slice(0,10)` (local → UTC mismatch)
 - Zod สำหรับ validate ทุก input (API body)
 
 ## Decisions Made (ไม่ต้องถามซ้ำ)
@@ -35,7 +39,7 @@
 - LIFF สำหรับ form input ที่ซับซ้อน — ไม่ทำ chat-based multi-step form
 - PK ใช้ `int generated always as identity` — ไม่ใช้ UUID (ลด complexity)
 - Employee schema ใช้ `first_name`/`last_name` + `wage` (รายวัน) + `ot_rate` (คำนวณอัตโนมัติ = wage/8×1.5)
-- Attendance ใช้ `morning_check`/`afternoon_check` boolean + `ot` double precision (ชั่วโมง decimal)
+- Attendance ใช้ `morning_check`/`afternoon_check` boolean + `ot` double precision (ชั่วโมง decimal) + `leave_reason` text nullable (เหตุผลหยุดงาน — null หมายถึงไม่ได้หยุดหรือไม่ได้ระบุ)
 - ไม่มี `hours_worked` GENERATED column — คำนวณใน application layer เมื่อต้องการ
 - Period ใช้ `is_active boolean` ไม่ใช้ `status enum` — เปิด/ปิดงวดด้วย flag เดียว
 - "Active period" หมายถึง `is_active = true AND today BETWEEN start_date AND end_date`
@@ -60,6 +64,7 @@
 
 ### Database
 - [x] Migration `0002_rebuild_schema.sql` — employees, periods (is_active), attendance (unique constraint), tasks
+- [x] Migration `0006_attendance_leave_reason.sql` — เพิ่ม `leave_reason text` ใน attendance
 
 ### Employee Feature
 - [x] Employee repository (select, insert, update, softDelete)
@@ -78,7 +83,7 @@
 - [x] Attendance service + controller + routes (`/api/attendance/missing-dates`, `GET /api/attendance`, `POST /api/attendance/batch`)
 - [x] LINE handler: `>ลงเวลา` → Flex message พร้อม LIFF URL
 - [x] LIFF: AttendanceOverviewPage (`/attendance`) — แสดงทุกงวด + วันที่ยังไม่ได้ลง → navigate to log form
-- [x] LIFF: AttendancePage (`/attendance/log`) — ฟอร์มลงเวลารายวัน (เช้า/บ่าย/OT)
+- [x] LIFF: AttendancePage (`/attendance/log`) — ฟอร์มลงเวลารายวัน (เช้า/บ่าย/OT) + เหตุผลหยุดงาน (expanded row เมื่อเช็ค "หยุด")
 - [x] LIFF: CreatePeriodPage (`/periods/new`) — form สร้างงวด
 
 ### Tasks Feature
@@ -90,9 +95,9 @@
 - [x] LINE: Daily Summary Broadcast (`sendDailySummary`) หลัง save tasks
 
 ### Reports Feature
-- [x] `GET /api/reports/work?date=YYYY-MM-DD` — PDF 3 หน้า A4 landscape: attendance summary, OT summary, task list
+- [x] `GET /api/reports/work?date=YYYY-MM-DD` — PDF 3 หน้า A4 landscape: attendance summary (แสดง "ห" amber เมื่อหยุดมีเหตุผล + footnote รายการเหตุผล), OT summary, task list
 - [x] `GET /api/reports/work/current` — work report ของ active period ณ วันนี้ (TZ-aware)
-- [x] `GET /api/reports/daily?date=YYYY-MM-DD` — daily summary PDF
+- [x] `GET /api/reports/daily?date=YYYY-MM-DD` — daily summary PDF (แสดงเหตุผลหยุดใต้ชื่อพนักงาน)
 - [x] LIFF: WorkReportPage (`/report/work`) — date picker + ปุ่ม download PDF
 - [x] PDFKit + Sarabun font (Regular + Bold) สำหรับ Thai text
 

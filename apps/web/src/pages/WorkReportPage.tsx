@@ -10,7 +10,10 @@ function formatThaiDate(dateStr: string): string {
 }
 
 export function WorkReportPage() {
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }, []);
   const [date, setDate] = useState(today);
 
   const downloadUrl = `/api/reports/work?date=${date}`;

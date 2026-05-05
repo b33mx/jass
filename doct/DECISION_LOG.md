@@ -23,6 +23,9 @@
 | 2026-04-28 | OT input UI | 1 decimal input vs 2 inputs (ชม./น.) | **2 inputs ชม./น.** | UX ดีกว่า ไม่ต้องพิมพ์ทศนิยม, convert เป็น decimal ตอน submit |
 | 2026-04-28 | Attendance flow | redirect ไป /periods/new ทันที vs empty state + ปุ่ม | **empty state + ปุ่ม** | ผู้ใช้เห็น context ว่าทำไมถึงต้องสร้างงวด ก่อนจะ navigate |
 | 2026-04-28 | Work logs | work_logs table (uuid[] responsible) vs tasks table (text employee_ids) | **tasks table (text employee_ids)** | schema จริงที่ implement ใช้ text comma-separated ไม่ใช่ uuid[] |
+| 2026-05-05 | Date string formatting ใน TZ+7 | `new Date(str+'T00:00:00').toISOString()` vs local getters | **local getters** (`getFullYear/getMonth/getDate`) | `toISOString()` คืน UTC — สร้าง local midnight แล้วแปลงกลับ UTC ทำให้วันเลื่อน -1 วันใน UTC+7 |
+| 2026-05-05 | Leave reason storage | is_holiday boolean column vs leave_reason text column | **leave_reason text (nullable)** ใน `attendance` table | boolean แยกไม่ออกระหว่าง "หยุดโดยไม่ลงบันทึก" กับ "หยุดมีเหตุผล" — text column รองรับทั้งสองกรณี (null = ไม่มีเหตุผล/ยังไม่ได้ลง) |
+| 2026-05-05 | Leave reason UX | modal vs expanded row ใน table vs แยก column | **expanded row** ใต้แถวพนักงานเมื่อเช็ค "หยุด" | ไม่เพิ่ม column (ตารางแน่นอยู่แล้ว), ไม่ต้องเปิด modal — input ปรากฏ inline ทันทีเมื่อ toggle |
 
 ---
 

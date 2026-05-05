@@ -20,6 +20,7 @@ export interface BatchAttendanceRecord {
   morning_check?: boolean;
   afternoon_check?: boolean;
   ot?: number;
+  leave_reason?: string;
 }
 
 export interface BatchAttendanceDto {

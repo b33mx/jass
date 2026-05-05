@@ -6,5 +6,6 @@ export interface Attendance {
   morning_check: boolean;
   afternoon_check: boolean;
   ot: number;
+  leave_reason: string | null;
   created_at: string;
 }

@@ -30,7 +30,10 @@ function datesInRange(start: string, end: string): string[] {
   const cur = new Date(start + 'T00:00:00');
   const fin = new Date(end + 'T00:00:00');
   while (cur <= fin) {
-    dates.push(cur.toISOString().slice(0, 10));
+    const y = cur.getFullYear();
+    const mo = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    dates.push(`${y}-${mo}-${d}`);
     cur.setDate(cur.getDate() + 1);
   }
   return dates;
@@ -89,13 +92,13 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
 
     // Page 1
     doc.fillColor(C.headerBg).rect(0, 0, PAGE_W, 64).fill();
-    doc.font('Bold').fontSize(14).fillColor('white')
+    doc.font('Bold').fontSize(17).fillColor('white')
       .text('รายงานการทำงาน', M, 18);
-    doc.font('Regular').fontSize(10).fillColor('#FECACA')
+    doc.font('Regular').fontSize(12).fillColor('#FECACA')
       .text(`งวด ${shortThaiDate(period.start_date)} - ${shortThaiDate(period.end_date)}`, M, 40);
 
     let y = 84;
-    doc.font('Bold').fontSize(11).fillColor(C.section).text('หน้า 1: สรุปการเข้างาน', M, y);
+    doc.font('Bold').fontSize(13).fillColor(C.section).text('หน้า 1: สรุปการเข้างาน', M, y);
     y += 20;
 
     const nameW = 160;
@@ -108,7 +111,7 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
     const rowH = 22;
     doc.fillColor('#FEE2E2').rect(M, y, CW, rowH).fill();
     doc.strokeColor(C.border).lineWidth(0.5).rect(M, y, CW, rowH).stroke();
-    doc.font('Bold').fontSize(9).fillColor(C.text);
+    doc.font('Bold').fontSize(11).fillColor(C.text);
     doc.text('ชื่อ', x + 4, y + 6, { width: nameW - 8, align: 'left', lineBreak: false });
     x += nameW;
     dates.forEach((d) => {
@@ -122,12 +125,14 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
     y += rowH;
 
     // Data rows
+    const leaveNotes: Array<{ empName: string; date: string; reason: string }> = [];
+
     employees.forEach((emp, idx) => {
       y = pageBreak(doc, y, rowH);
       x = M;
       if (idx % 2 === 1) doc.fillColor('#FFFBEB').rect(M, y, CW, rowH).fill();
       doc.strokeColor(C.border).lineWidth(0.35).rect(M, y, CW, rowH).stroke();
-      doc.font('Regular').fontSize(8.5).fillColor(C.text)
+      doc.font('Regular').fontSize(10.5).fillColor(C.text)
         .text(`${emp.first_name} ${emp.last_name}`, x + 4, y + 6, { width: nameW - 8, lineBreak: false });
       x += nameW;
 
@@ -138,30 +143,49 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
         const v = attValue(att);
         labor += v;
         ot += att?.ot ?? 0;
+
+        if (att && v === 0 && att.leave_reason) {
+          leaveNotes.push({ empName: `${emp.first_name} ${emp.last_name}`, date: d, reason: att.leave_reason });
+        }
+
         const color = v === 0 ? C.red : C.text;
-        doc.font('Bold').fontSize(8.5).fillColor(color)
+        doc.font('Bold').fontSize(10.5).fillColor(color)
           .text(String(v), x, y + 6, { width: dayW, align: 'center', lineBreak: false });
         x += dayW;
       });
 
-      doc.font('Bold').fontSize(8.5).fillColor(C.text)
+      doc.font('Bold').fontSize(10.5).fillColor(C.text)
         .text(String(labor), x, y + 6, { width: laborW, align: 'center', lineBreak: false });
       x += laborW;
-      doc.font('Regular').fontSize(8.5).fillColor(C.text)
+      doc.font('Regular').fontSize(10.5).fillColor(C.text)
         .text(ot > 0 ? String(ot) : '-', x, y + 6, { width: otW, align: 'center', lineBreak: false });
       y += rowH;
     });
 
+    // Leave reason footnote
+    if (leaveNotes.length > 0) {
+      y += 10;
+      y = pageBreak(doc, y, 20);
+      doc.font('Bold').fontSize(11).fillColor(C.section).text('หมายเหตุวันหยุด:', M, y);
+      y += 14;
+      leaveNotes.forEach((note) => {
+        y = pageBreak(doc, y, 14);
+        doc.font('Regular').fontSize(10.5).fillColor(C.muted)
+          .text(`${note.empName}  ${shortThaiDate(note.date)}  –  ${note.reason}`, M + 8, y, { lineBreak: false });
+        y += 14;
+      });
+    }
+
     // Page 2: OT summary
     doc.addPage();
     doc.fillColor(C.headerBg).rect(0, 0, PAGE_W, 64).fill();
-    doc.font('Bold').fontSize(14).fillColor('white')
+    doc.font('Bold').fontSize(17).fillColor('white')
       .text('รายงานการทำงาน (สรุป OT)', M, 18);
-    doc.font('Regular').fontSize(10).fillColor('#FECACA')
+    doc.font('Regular').fontSize(12).fillColor('#FECACA')
       .text(`งวด ${shortThaiDate(period.start_date)} - ${shortThaiDate(period.end_date)}`, M, 40);
 
     y = 84;
-    doc.font('Bold').fontSize(11).fillColor(C.section).text('หน้า 2: สรุป OT', M, y);
+    doc.font('Bold').fontSize(13).fillColor(C.section).text('หน้า 2: สรุป OT', M, y);
     y += 20;
 
     const otNameW = 160;
@@ -172,7 +196,7 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
     let x2 = M;
     doc.fillColor('#FEE2E2').rect(M, y, CW, otRowH).fill();
     doc.strokeColor(C.border).lineWidth(0.5).rect(M, y, CW, otRowH).stroke();
-    doc.font('Bold').fontSize(9).fillColor(C.text);
+    doc.font('Bold').fontSize(11).fillColor(C.text);
     doc.text('ชื่อ', x2 + 4, y + 6, { width: otNameW - 8, align: 'left', lineBreak: false });
     x2 += otNameW;
     dates.forEach((d) => {
@@ -188,7 +212,7 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
       x2 = M;
       if (idx % 2 === 1) doc.fillColor('#FFFBEB').rect(M, y, CW, otRowH).fill();
       doc.strokeColor(C.border).lineWidth(0.35).rect(M, y, CW, otRowH).stroke();
-      doc.font('Regular').fontSize(8.5).fillColor(C.text)
+      doc.font('Regular').fontSize(10.5).fillColor(C.text)
         .text(`${emp.first_name} ${emp.last_name}`, x2 + 4, y + 6, { width: otNameW - 8, lineBreak: false });
       x2 += otNameW;
 
@@ -197,12 +221,12 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
         const att = attLookup.get(emp.employee_id)?.get(d);
         const otVal = att?.ot ?? 0;
         totalOt += otVal;
-        doc.font('Regular').fontSize(8.5).fillColor(otVal > 0 ? C.section : C.muted)
+        doc.font('Regular').fontSize(10.5).fillColor(otVal > 0 ? C.section : C.muted)
           .text(otVal > 0 ? String(otVal) : '-', x2, y + 6, { width: otDayW, align: 'center', lineBreak: false });
         x2 += otDayW;
       });
 
-      doc.font('Bold').fontSize(8.5).fillColor(totalOt > 0 ? C.section : C.text)
+      doc.font('Bold').fontSize(10.5).fillColor(totalOt > 0 ? C.section : C.text)
         .text(totalOt > 0 ? String(totalOt) : '-', x2, y + 6, { width: otTotalW, align: 'center', lineBreak: false });
       y += otRowH;
     });
@@ -210,13 +234,13 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
     // Page 3: work items
     doc.addPage();
     doc.fillColor(C.headerBg).rect(0, 0, PAGE_W, 64).fill();
-    doc.font('Bold').fontSize(14).fillColor('white')
+    doc.font('Bold').fontSize(17).fillColor('white')
       .text('รายงานการทำงาน (งานที่ทำ)', M, 18);
-    doc.font('Regular').fontSize(10).fillColor('#FECACA')
+    doc.font('Regular').fontSize(12).fillColor('#FECACA')
       .text(`งวด ${shortThaiDate(period.start_date)} - ${shortThaiDate(period.end_date)}`, M, 40);
 
     y = 84;
-    doc.font('Bold').fontSize(11).fillColor(C.section).text('หน้า 3: วันที่ | งานที่ทำ | ผู้รับผิดชอบ', M, y);
+    doc.font('Bold').fontSize(13).fillColor(C.section).text('หน้า 3: วันที่ | งานที่ทำ | ผู้รับผิดชอบ', M, y);
     y += 20;
 
     const c1 = 120;
@@ -226,7 +250,7 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
 
     doc.fillColor('#FEE2E2').rect(M, y, CW, hdrH).fill();
     doc.strokeColor(C.border).lineWidth(0.5).rect(M, y, CW, hdrH).stroke();
-    doc.font('Bold').fontSize(9).fillColor(C.text);
+    doc.font('Bold').fontSize(11).fillColor(C.text);
     doc.text('วันที่', M + 4, y + 6, { width: c1 - 8, align: 'left', lineBreak: false });
     doc.text('งานที่ทำ', M + c1 + 4, y + 6, { width: c2 - 8, align: 'left', lineBreak: false });
     doc.text('ผู้รับผิดชอบ', M + c1 + c2 + 4, y + 6, { width: c3 - 8, align: 'left', lineBreak: false });
@@ -238,7 +262,7 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
     });
 
     if (sorted.length === 0) {
-      doc.font('Regular').fontSize(10).fillColor(C.muted).text('ไม่มีข้อมูลงานในงวดนี้', M + 4, y + 10);
+      doc.font('Regular').fontSize(12).fillColor(C.muted).text('ไม่มีข้อมูลงานในงวดนี้', M + 4, y + 10);
       doc.end();
       return;
     }
@@ -263,7 +287,7 @@ export async function generateWorkReport(date: string): Promise<Buffer> {
       if (idx % 2 === 1) doc.fillColor('#FFFBEB').rect(M, y, CW, bodyH).fill();
       doc.strokeColor(C.border).lineWidth(0.35).rect(M, y, CW, bodyH).stroke();
 
-      doc.font('Regular').fontSize(9).fillColor(C.text);
+      doc.font('Regular').fontSize(11).fillColor(C.text);
       doc.text(shortThaiDate(t.task_date), M + 5, y + 8, { width: c1 - 10 });
       doc.text(taskText, M + c1 + 5, y + 8, { width: c2 - 10 });
       doc.text(names || '-', M + c1 + c2 + 5, y + 8, { width: c3 - 10 });

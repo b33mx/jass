@@ -11,6 +11,7 @@ const batchSchema = z.object({
       morning_check: z.boolean().optional(),
       afternoon_check: z.boolean().optional(),
       ot: z.number().min(0).optional(),
+      leave_reason: z.string().max(200).optional(),
     })
   ).min(1),
 });
