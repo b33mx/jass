@@ -5,6 +5,7 @@ import { createPayrollFlexMessage } from '../messages/payroll-menu.js';
 import type { LineEvent } from '../types.js';
 import { env } from '../../../config/env.js';
 import { getAllEmployees } from '../../../modules/employees/employee.service.js';
+import { handleUserFollow } from '../../../modules/line-users/line-user.service.js';
 
 const TRIGGER_MENU = '>พนักงาน';
 const TRIGGER_LIST = '>รายชื่อ';
@@ -12,6 +13,12 @@ const TRIGGER_ATTENDANCE = '>ลงเวลา';
 const TRIGGER_PAYROLL = '>เงินเดือน';
 
 export async function handleLineEvent(event: LineEvent): Promise<void> {
+  if (event.type === 'follow') {
+    const lineUserId = event.source?.userId;
+    if (lineUserId) await handleUserFollow(lineUserId);
+    return;
+  }
+
   if (event.type !== 'message') return;
   if (event.message?.type !== 'text' || !event.replyToken) return;
 

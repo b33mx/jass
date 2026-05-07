@@ -7,6 +7,10 @@ export type LineWebhookRequestBody = {
 export type LineEvent = {
   type: string;
   replyToken?: string;
+  source?: {
+    type: string;
+    userId?: string;
+  };
   message?: {
     type: string;
     text?: string;
