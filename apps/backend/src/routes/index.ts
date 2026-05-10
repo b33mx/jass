@@ -6,11 +6,13 @@ import { taskRouter } from '../modules/tasks/task.route.js';
 import { reportRouter } from '../modules/reports/report.route.js';
 import { healthRouter } from './health.route.js';
 import { lineWebhookRouter } from './line-webhook.route.js';
+import { lineAuthMiddleware } from '../middleware/line-auth.js';
 
 export function registerRoutes(app: Express) {
   app.use('/health', healthRouter);
   app.use('/webhook/line', lineWebhookRouter);
   app.use('/webhook', lineWebhookRouter);
+  app.use('/api', lineAuthMiddleware);
   app.use('/api/employees', employeeRouter);
   app.use('/api/periods', periodRouter);
   app.use('/api/attendance', attendanceRouter);

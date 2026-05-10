@@ -19,14 +19,20 @@ function todayInTimezone(timeZone: string): string {
   return `${year}-${month}-${day}`;
 }
 
+function getCompanyId(req: Request, tokenCompanyId?: number): number {
+  return tokenCompanyId ?? req.lineUser!.companyId;
+}
+
 export async function handleDailyReport(req: Request, res: Response, next: NextFunction) {
   let date = req.query.date as string | undefined;
+  let tokenCompanyId: number | undefined;
   const token = req.query.t as string | undefined;
   if (token) {
     try {
       const payload = parseReportToken(token);
       if (payload.kind !== 'daily' || !payload.date) throw new Error('invalid token kind');
       date = payload.date;
+      tokenCompanyId = payload.companyId;
     } catch {
       res.status(400).json({ error: 'invalid report token' });
       return;
@@ -37,7 +43,7 @@ export async function handleDailyReport(req: Request, res: Response, next: NextF
     return;
   }
   try {
-    const pdf = await generateDailyReport(date);
+    const pdf = await generateDailyReport(date, getCompanyId(req, tokenCompanyId));
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="daily-report-${date}.pdf"`);
     res.setHeader('Content-Length', pdf.length);
@@ -49,12 +55,14 @@ export async function handleDailyReport(req: Request, res: Response, next: NextF
 
 export async function handleWorkReport(req: Request, res: Response, next: NextFunction) {
   let date = req.query.date as string | undefined;
+  let tokenCompanyId: number | undefined;
   const token = req.query.t as string | undefined;
   if (token) {
     try {
       const payload = parseReportToken(token);
       if (payload.kind !== 'work' || !payload.date) throw new Error('invalid token kind');
       date = payload.date;
+      tokenCompanyId = payload.companyId;
     } catch {
       res.status(400).json({ error: 'invalid report token' });
       return;
@@ -65,7 +73,7 @@ export async function handleWorkReport(req: Request, res: Response, next: NextFu
     return;
   }
   try {
-    const buf = await generateWorkReport(date);
+    const buf = await generateWorkReport(date, getCompanyId(req, tokenCompanyId));
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="work-report-${date}.pdf"`);
     res.setHeader('Content-Length', buf.length);
@@ -75,10 +83,10 @@ export async function handleWorkReport(req: Request, res: Response, next: NextFu
   }
 }
 
-export async function handleCurrentWorkReport(_req: Request, res: Response, next: NextFunction) {
+export async function handleCurrentWorkReport(req: Request, res: Response, next: NextFunction) {
   const date = todayInTimezone(env.TZ);
   try {
-    const buf = await generateWorkReport(date);
+    const buf = await generateWorkReport(date, req.lineUser!.companyId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="work-report-${date}.pdf"`);
     res.setHeader('Content-Length', buf.length);
@@ -90,12 +98,14 @@ export async function handleCurrentWorkReport(_req: Request, res: Response, next
 
 export async function handleTimecardReport(req: Request, res: Response, next: NextFunction) {
   let periodId = Number(req.query.period_id);
+  let tokenCompanyId: number | undefined;
   const token = req.query.t as string | undefined;
   if (token) {
     try {
       const payload = parseReportToken(token);
       if (payload.kind !== 'timecard' || !payload.periodId) throw new Error('invalid token kind');
       periodId = payload.periodId;
+      tokenCompanyId = payload.companyId;
     } catch {
       res.status(400).json({ error: 'invalid report token' });
       return;
@@ -106,7 +116,7 @@ export async function handleTimecardReport(req: Request, res: Response, next: Ne
     return;
   }
   try {
-    const buf = await generateTimecardReport(periodId);
+    const buf = await generateTimecardReport(periodId, getCompanyId(req, tokenCompanyId));
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="timecard-period-${periodId}.pdf"`);
     res.setHeader('Content-Length', buf.length);
@@ -118,12 +128,14 @@ export async function handleTimecardReport(req: Request, res: Response, next: Ne
 
 export async function handlePayrollPacketReport(req: Request, res: Response, next: NextFunction) {
   let periodId = Number(req.query.period_id);
+  let tokenCompanyId: number | undefined;
   const token = req.query.t as string | undefined;
   if (token) {
     try {
       const payload = parseReportToken(token);
       if (payload.kind !== 'payroll-packet' || !payload.periodId) throw new Error('invalid token kind');
       periodId = payload.periodId;
+      tokenCompanyId = payload.companyId;
     } catch {
       res.status(400).json({ error: 'invalid report token' });
       return;
@@ -134,7 +146,7 @@ export async function handlePayrollPacketReport(req: Request, res: Response, nex
     return;
   }
   try {
-    const buf = await generatePayrollPacketReport(periodId);
+    const buf = await generatePayrollPacketReport(periodId, getCompanyId(req, tokenCompanyId));
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="payroll-packet-period-${periodId}.pdf"`);
     res.setHeader('Content-Length', buf.length);
@@ -168,6 +180,7 @@ export async function handleCreateReportLink(req: Request, res: Response) {
     kind,
     date: kind === 'daily' || kind === 'work' ? date : undefined,
     periodId: kind === 'timecard' || kind === 'payroll-packet' ? periodId : undefined,
+    companyId: req.lineUser!.companyId,
   });
   const url = buildReportUrl(env.API_BASE_URL, token);
   res.json({ token, url });

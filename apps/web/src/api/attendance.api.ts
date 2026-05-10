@@ -1,3 +1,5 @@
+import { apiFetch } from '../lib/api.ts';
+
 export interface Attendance {
   attendance_id: number;
   attendance_date: string;
@@ -25,7 +27,7 @@ export interface AttendanceBatchPayload {
 }
 
 export async function getMissingDates(periodId: number): Promise<string[]> {
-  const res = await fetch(`/api/attendance/missing-dates?period_id=${periodId}`);
+  const res = await apiFetch(`/api/attendance/missing-dates?period_id=${periodId}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? 'ไม่สามารถดึงวันที่ได้');
@@ -34,7 +36,7 @@ export async function getMissingDates(periodId: number): Promise<string[]> {
 }
 
 export async function getAttendanceForDate(periodId: number, date: string): Promise<Attendance[]> {
-  const res = await fetch(`/api/attendance?period_id=${periodId}&date=${date}`);
+  const res = await apiFetch(`/api/attendance?period_id=${periodId}&date=${date}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? 'ไม่สามารถดึงข้อมูลการลงเวลาได้');
@@ -43,7 +45,7 @@ export async function getAttendanceForDate(periodId: number, date: string): Prom
 }
 
 export async function saveAttendanceBatch(payload: AttendanceBatchPayload): Promise<Attendance[]> {
-  const res = await fetch('/api/attendance/batch', {
+  const res = await apiFetch('/api/attendance/batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

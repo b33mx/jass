@@ -8,6 +8,7 @@ export async function insertEmployee(data: {
   last_name: string;
   wage: number;
   ot_rate: number;
+  company_id: number;
 }): Promise<Employee> {
   const { data: employee, error } = await supabase
     .from('employees')
@@ -19,10 +20,11 @@ export async function insertEmployee(data: {
   return employee as Employee;
 }
 
-export async function selectAllEmployees(): Promise<Employee[]> {
+export async function selectAllEmployees(companyId: number): Promise<Employee[]> {
   const { data, error } = await supabase
     .from('employees')
     .select(EMPLOYEE_FIELDS)
+    .eq('company_id', companyId)
     .eq('is_active', true)
     .order('first_name', { ascending: true });
 
@@ -30,11 +32,12 @@ export async function selectAllEmployees(): Promise<Employee[]> {
   return (data ?? []) as Employee[];
 }
 
-export async function selectEmployeeById(id: number): Promise<Employee | null> {
+export async function selectEmployeeById(id: number, companyId: number): Promise<Employee | null> {
   const { data, error } = await supabase
     .from('employees')
     .select(EMPLOYEE_FIELDS)
     .eq('employee_id', id)
+    .eq('company_id', companyId)
     .single();
 
   if (error) return null;
@@ -43,12 +46,14 @@ export async function selectEmployeeById(id: number): Promise<Employee | null> {
 
 export async function updateEmployeeById(
   id: number,
+  companyId: number,
   data: { first_name: string; last_name: string; wage: number; ot_rate: number }
 ): Promise<Employee> {
   const { data: employee, error } = await supabase
     .from('employees')
     .update(data)
     .eq('employee_id', id)
+    .eq('company_id', companyId)
     .select(EMPLOYEE_FIELDS)
     .single();
 
@@ -56,11 +61,12 @@ export async function updateEmployeeById(
   return employee as Employee;
 }
 
-export async function softDeleteEmployeeById(id: number): Promise<Employee | null> {
+export async function softDeleteEmployeeById(id: number, companyId: number): Promise<Employee | null> {
   const { data, error } = await supabase
     .from('employees')
     .update({ is_active: false })
     .eq('employee_id', id)
+    .eq('company_id', companyId)
     .eq('is_active', true)
     .select(EMPLOYEE_FIELDS)
     .maybeSingle();

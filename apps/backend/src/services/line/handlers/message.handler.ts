@@ -6,6 +6,7 @@ import type { LineEvent } from '../types.js';
 import { env } from '../../../config/env.js';
 import { getAllEmployees } from '../../../modules/employees/employee.service.js';
 import { handleUserFollow } from '../../../modules/line-users/line-user.service.js';
+import { getLineUserByLineId } from '../../../modules/line-users/line-user.repository.js';
 
 const TRIGGER_MENU = '>พนักงาน';
 const TRIGGER_LIST = '>รายชื่อ';
@@ -21,6 +22,16 @@ export async function handleLineEvent(event: LineEvent): Promise<void> {
 
   if (event.type !== 'message') return;
   if (event.message?.type !== 'text' || !event.replyToken) return;
+
+  const lineUserId = event.source?.userId;
+  if (!lineUserId) return;
+
+  const lineUser = await getLineUserByLineId(lineUserId);
+  if (!lineUser?.company_id) {
+    await replyToLine(event.replyToken, [{ type: 'text', text: 'กรุณาติดต่อ admin เพื่อตั้งค่าเบื้องต้น' }]);
+    return;
+  }
+  const companyId = lineUser.company_id;
 
   const userText = event.message.text?.trim();
 
@@ -40,7 +51,7 @@ export async function handleLineEvent(event: LineEvent): Promise<void> {
   }
 
   if (userText === TRIGGER_LIST) {
-    const employees = await getAllEmployees();
+    const employees = await getAllEmployees(companyId);
     const text =
       employees.length === 0
         ? 'ยังไม่มีพนักงานในระบบ'

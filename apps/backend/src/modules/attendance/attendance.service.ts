@@ -13,8 +13,8 @@ function eachDayInRange(start: string, end: string): string[] {
   return dates;
 }
 
-export async function getMissingDates(periodId: number): Promise<string[]> {
-  const period = await getPeriodById(periodId);
+export async function getMissingDates(periodId: number, companyId: number): Promise<string[]> {
+  const period = await getPeriodById(periodId, companyId);
   if (!period) throw new Error('ไม่พบงวด');
 
   const allDates = eachDayInRange(period.start_date, period.end_date);

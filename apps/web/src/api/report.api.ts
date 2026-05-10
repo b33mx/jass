@@ -1,3 +1,5 @@
+import { apiFetch } from '../lib/api.ts';
+
 export type ReportKind = 'daily' | 'work' | 'timecard' | 'payroll-packet';
 
 interface CreateReportLinkPayload {
@@ -7,7 +9,7 @@ interface CreateReportLinkPayload {
 }
 
 export async function createReportLink(payload: CreateReportLinkPayload): Promise<string> {
-  const res = await fetch('/api/reports/link', {
+  const res = await apiFetch('/api/reports/link', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

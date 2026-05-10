@@ -62,14 +62,14 @@ function pageBreak(doc: PDFKit.PDFDocument, y: number, needed: number): number {
   return y;
 }
 
-export async function generateWorkReport(date: string): Promise<Buffer> {
-  const period = await selectActivePeriod(date);
+export async function generateWorkReport(date: string, companyId: number): Promise<Buffer> {
+  const period = await selectActivePeriod(date, companyId);
   if (!period) throw new Error('ไม่พบงวดที่เปิดอยู่สำหรับวันที่นี้');
 
   const [allAtt, employees, tasks] = await Promise.all([
     selectAttendanceByPeriodId(period.period_id),
-    selectAllEmployees(),
-    getTasksByDateRange(period.start_date, period.end_date),
+    selectAllEmployees(companyId),
+    getTasksByDateRange(period.start_date, period.end_date, companyId),
   ]);
 
   const dates = datesInRange(period.start_date, period.end_date);

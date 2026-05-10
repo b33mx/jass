@@ -1,3 +1,5 @@
+import { apiFetch } from '../lib/api.ts';
+
 export interface CreateEmployeePayload {
   firstName: string;
   lastName: string;
@@ -16,7 +18,7 @@ export interface Employee {
 }
 
 export async function getAllEmployees(): Promise<Employee[]> {
-  const res = await fetch('/api/employees');
+  const res = await apiFetch('/api/employees');
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -27,7 +29,7 @@ export async function getAllEmployees(): Promise<Employee[]> {
 }
 
 export async function createEmployee(payload: CreateEmployeePayload): Promise<Employee> {
-  const res = await fetch('/api/employees', {
+  const res = await apiFetch('/api/employees', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -42,7 +44,7 @@ export async function createEmployee(payload: CreateEmployeePayload): Promise<Em
 }
 
 export async function getEmployeeById(id: number): Promise<Employee> {
-  const res = await fetch(`/api/employees/${id}`);
+  const res = await apiFetch(`/api/employees/${id}`);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -53,7 +55,7 @@ export async function getEmployeeById(id: number): Promise<Employee> {
 }
 
 export async function updateEmployee(id: number, payload: CreateEmployeePayload): Promise<Employee> {
-  const res = await fetch(`/api/employees/${id}`, {
+  const res = await apiFetch(`/api/employees/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -68,7 +70,7 @@ export async function updateEmployee(id: number, payload: CreateEmployeePayload)
 }
 
 export async function deleteEmployee(id: number): Promise<void> {
-  const res = await fetch(`/api/employees/${id}`, {
+  const res = await apiFetch(`/api/employees/${id}`, {
     method: 'DELETE',
   });
 

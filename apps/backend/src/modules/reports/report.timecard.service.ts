@@ -233,13 +233,13 @@ function drawEmployeePage(
     .text(`รวมทั้งสิ้น: ${thb(gross)} บาท`, M + 10, y + 70, { lineBreak: false });
 }
 
-export async function generateTimecardReport(periodId: number): Promise<Buffer> {
-  const period = await selectPeriodById(periodId);
+export async function generateTimecardReport(periodId: number, companyId: number): Promise<Buffer> {
+  const period = await selectPeriodById(periodId, companyId);
   if (!period) throw Object.assign(new Error('ไม่พบงวด'), { status: 404 });
 
   const [allAtt, employees] = await Promise.all([
     selectAttendanceByPeriodId(periodId),
-    selectAllEmployees(),
+    selectAllEmployees(companyId),
   ]);
 
   const dates = datesInRange(period.start_date, period.end_date);

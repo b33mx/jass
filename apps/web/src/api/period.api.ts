@@ -1,3 +1,5 @@
+import { apiFetch } from '../lib/api.ts';
+
 export interface Period {
   period_id: number;
   start_date: string;
@@ -31,7 +33,7 @@ export interface PayrollResult {
 }
 
 export async function getAllPeriods(): Promise<Period[]> {
-  const res = await fetch('/api/periods');
+  const res = await apiFetch('/api/periods');
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? 'ไม่สามารถดึงข้อมูลงวดได้');
@@ -40,7 +42,7 @@ export async function getAllPeriods(): Promise<Period[]> {
 }
 
 export async function getActivePeriod(): Promise<Period | null> {
-  const res = await fetch('/api/periods/active');
+  const res = await apiFetch('/api/periods/active');
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? 'ไม่สามารถดึงข้อมูลงวดได้');
@@ -50,7 +52,7 @@ export async function getActivePeriod(): Promise<Period | null> {
 }
 
 export async function createPeriod(payload: CreatePeriodPayload): Promise<Period> {
-  const res = await fetch('/api/periods', {
+  const res = await apiFetch('/api/periods', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -63,7 +65,7 @@ export async function createPeriod(payload: CreatePeriodPayload): Promise<Period
 }
 
 export async function calculatePayroll(periodId: number): Promise<PayrollResult> {
-  const res = await fetch(`/api/periods/${periodId}/calculate`, { method: 'POST' });
+  const res = await apiFetch(`/api/periods/${periodId}/calculate`, { method: 'POST' });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? 'ไม่สามารถคำนวณเงินเดือนได้');
@@ -72,7 +74,7 @@ export async function calculatePayroll(periodId: number): Promise<PayrollResult>
 }
 
 export async function closePeriod(periodId: number): Promise<Period> {
-  const res = await fetch(`/api/periods/${periodId}/close`, { method: 'POST' });
+  const res = await apiFetch(`/api/periods/${periodId}/close`, { method: 'POST' });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? 'ไม่สามารถปิดงวดได้');

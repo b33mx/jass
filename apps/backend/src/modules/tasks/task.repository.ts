@@ -8,7 +8,7 @@ const TASK_SELECT = `
 `.trim();
 
 export async function insertTasks(
-  records: Array<{ task_date: string; task: string; detail?: string; start_time?: string; end_time?: string; employee_ids: string }>
+  records: Array<{ task_date: string; task: string; detail?: string; start_time?: string; end_time?: string; employee_ids: string; company_id: number }>
 ): Promise<{ task_id: number }[]> {
   const { data, error } = await supabase
     .from('tasks')
@@ -26,11 +26,12 @@ export async function insertTaskImages(
   if (error) throw new Error(error.message);
 }
 
-export async function getTaskImagesByDate(date: string): Promise<TaskImage[]> {
+export async function getTaskImagesByDate(date: string, companyId: number): Promise<TaskImage[]> {
   const { data: tasks, error: tErr } = await supabase
     .from('tasks')
     .select('task_id')
-    .eq('task_date', date);
+    .eq('task_date', date)
+    .eq('company_id', companyId);
   if (tErr) throw new Error(tErr.message);
 
   const taskIds = (tasks ?? []).map((t: { task_id: number }) => t.task_id);
@@ -44,15 +45,20 @@ export async function getTaskImagesByDate(date: string): Promise<TaskImage[]> {
   return (data ?? []) as TaskImage[];
 }
 
-export async function deleteTasksByDate(date: string): Promise<void> {
-  const { error } = await supabase.from('tasks').delete().eq('task_date', date);
+export async function deleteTasksByDate(date: string, companyId: number): Promise<void> {
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('task_date', date)
+    .eq('company_id', companyId);
   if (error) throw new Error(error.message);
 }
 
-export async function getTasksByDateRange(start: string, end: string): Promise<Task[]> {
+export async function getTasksByDateRange(start: string, end: string, companyId: number): Promise<Task[]> {
   const { data, error } = await supabase
     .from('tasks')
     .select(TASK_SELECT)
+    .eq('company_id', companyId)
     .gte('task_date', start)
     .lte('task_date', end)
     .order('task_date', { ascending: true })
@@ -61,11 +67,12 @@ export async function getTasksByDateRange(start: string, end: string): Promise<T
   return (data ?? []) as unknown as Task[];
 }
 
-export async function getTasksByDate(date: string): Promise<Task[]> {
+export async function getTasksByDate(date: string, companyId: number): Promise<Task[]> {
   const { data, error } = await supabase
     .from('tasks')
     .select(TASK_SELECT)
     .eq('task_date', date)
+    .eq('company_id', companyId)
     .order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as Task[];

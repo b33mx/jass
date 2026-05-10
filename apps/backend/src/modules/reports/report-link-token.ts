@@ -7,6 +7,7 @@ export interface ReportTokenPayload {
   kind: ReportKind;
   date?: string;
   periodId?: number;
+  companyId: number;
   exp: number;
 }
 
@@ -18,6 +19,7 @@ function getKey(): Buffer {
 }
 
 export function createReportToken(input: Omit<ReportTokenPayload, 'exp'>, ttlSeconds = 60 * 60 * 24 * 7): string {
+  // input must include companyId
   const payload: ReportTokenPayload = {
     ...input,
     exp: Math.floor(Date.now() / 1000) + ttlSeconds,

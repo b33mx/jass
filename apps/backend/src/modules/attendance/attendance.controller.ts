@@ -24,7 +24,7 @@ export async function handleGetMissingDates(req: Request, res: Response, next: N
   }
 
   try {
-    const dates = await getMissingDates(periodId);
+    const dates = await getMissingDates(periodId, req.lineUser!.companyId);
     res.json(dates);
   } catch (err) {
     next(err);

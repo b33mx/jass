@@ -3,13 +3,13 @@ import { selectAttendanceByPeriodId } from '../attendance/attendance.repository.
 import { selectAllEmployees } from '../employees/employee.repository.js';
 import type { CreatePeriodDto, PayrollResult, Period } from './period.types.js';
 
-export async function getActivePeriod(): Promise<Period | null> {
+export async function getActivePeriod(companyId: number): Promise<Period | null> {
   const today = new Date().toISOString().slice(0, 10);
-  return selectActivePeriod(today);
+  return selectActivePeriod(today, companyId);
 }
 
-export async function createPeriod(dto: CreatePeriodDto): Promise<Period> {
-  const overlap = await selectOverlappingPeriod(dto.start_date, dto.end_date);
+export async function createPeriod(dto: CreatePeriodDto, companyId: number): Promise<Period> {
+  const overlap = await selectOverlappingPeriod(dto.start_date, dto.end_date, companyId);
   if (overlap) {
     const err = Object.assign(
       new Error(`วันที่ทับซ้อนกับงวด ${overlap.start_date} – ${overlap.end_date}`),
@@ -17,31 +17,31 @@ export async function createPeriod(dto: CreatePeriodDto): Promise<Period> {
     );
     throw err;
   }
-  return insertPeriod({ start_date: dto.start_date, end_date: dto.end_date });
+  return insertPeriod({ start_date: dto.start_date, end_date: dto.end_date, company_id: companyId });
 }
 
-export async function getPeriodById(id: number): Promise<Period | null> {
-  return selectPeriodById(id);
+export async function getPeriodById(id: number, companyId?: number): Promise<Period | null> {
+  return selectPeriodById(id, companyId);
 }
 
-export async function getAllPeriods(): Promise<Period[]> {
-  return selectAllPeriods();
+export async function getAllPeriods(companyId: number): Promise<Period[]> {
+  return selectAllPeriods(companyId);
 }
 
-export async function closePeriod(periodId: number): Promise<Period> {
-  const period = await getPeriodById(periodId);
+export async function closePeriod(periodId: number, companyId: number): Promise<Period> {
+  const period = await getPeriodById(periodId, companyId);
   if (!period) throw Object.assign(new Error('ไม่พบงวด'), { status: 404 });
   if (!period.is_active) return period;
-  return closePeriodById(periodId);
+  return closePeriodById(periodId, companyId);
 }
 
-export async function calculatePayroll(periodId: number): Promise<PayrollResult> {
-  const period = await getPeriodById(periodId);
+export async function calculatePayroll(periodId: number, companyId: number): Promise<PayrollResult> {
+  const period = await getPeriodById(periodId, companyId);
   if (!period) throw Object.assign(new Error('ไม่พบงวด'), { status: 404 });
 
   const [allAtt, employees] = await Promise.all([
     selectAttendanceByPeriodId(periodId),
-    selectAllEmployees(),
+    selectAllEmployees(companyId),
   ]);
 
   const attByEmployee = new Map<number, typeof allAtt>();

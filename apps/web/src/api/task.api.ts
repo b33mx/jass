@@ -1,3 +1,5 @@
+import { apiFetch } from '../lib/api.ts';
+
 export interface TaskImageData {
   file_name: string;
   public_url: string;
@@ -32,7 +34,7 @@ export interface Task {
 }
 
 export async function getTasksForDate(date: string): Promise<Task[]> {
-  const res = await fetch(`/api/tasks?date=${encodeURIComponent(date)}`);
+  const res = await apiFetch(`/api/tasks?date=${encodeURIComponent(date)}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? 'ไม่สามารถดึงข้อมูลงานได้');
@@ -41,7 +43,7 @@ export async function getTasksForDate(date: string): Promise<Task[]> {
 }
 
 export async function triggerDailySummary(date: string): Promise<void> {
-  const res = await fetch('/api/tasks/summary', {
+  const res = await apiFetch('/api/tasks/summary', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ date }),
@@ -53,7 +55,7 @@ export async function triggerDailySummary(date: string): Promise<void> {
 }
 
 export async function replaceTasksForDate(date: string, tasks: CreateTaskPayload[]): Promise<void> {
-  const res = await fetch('/api/tasks', {
+  const res = await apiFetch('/api/tasks', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ date, tasks }),
@@ -70,7 +72,7 @@ export async function uploadTaskImages(files: File[], periodStart: string): Prom
   const form = new FormData();
   form.append('period', periodStart);
   compressed.forEach((f) => form.append('images', f));
-  const res = await fetch('/api/tasks/images', { method: 'POST', body: form });
+  const res = await apiFetch('/api/tasks/images', { method: 'POST', body: form });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? 'ไม่สามารถอัปโหลดรูปภาพได้');
@@ -80,7 +82,7 @@ export async function uploadTaskImages(files: File[], periodStart: string): Prom
 }
 
 export async function createTasks(tasks: CreateTaskPayload[]): Promise<void> {
-  const res = await fetch('/api/tasks', {
+  const res = await apiFetch('/api/tasks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tasks }),

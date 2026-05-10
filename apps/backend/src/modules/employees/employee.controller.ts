@@ -8,9 +8,9 @@ const employeeSchema = z.object({
   wage: z.number().positive('ค่าแรงต้องมากกว่า 0'),
 });
 
-export async function handleGetAllEmployees(_req: Request, res: Response, next: NextFunction) {
+export async function handleGetAllEmployees(req: Request, res: Response, next: NextFunction) {
   try {
-    const employees = await getAllEmployees();
+    const employees = await getAllEmployees(req.lineUser!.companyId);
     res.json(employees);
   } catch (err) {
     next(err);
@@ -25,7 +25,7 @@ export async function handleCreateEmployee(req: Request, res: Response, next: Ne
   }
 
   try {
-    const employee = await createEmployee(parsed.data);
+    const employee = await createEmployee(parsed.data, req.lineUser!.companyId);
     res.status(201).json(employee);
   } catch (err) {
     next(err);
@@ -40,7 +40,7 @@ export async function handleGetEmployeeById(req: Request, res: Response, next: N
   }
 
   try {
-    const employee = await getEmployeeById(id);
+    const employee = await getEmployeeById(id, req.lineUser!.companyId);
     if (!employee) {
       res.status(404).json({ error: 'ไม่พบพนักงาน' });
       return;
@@ -65,7 +65,7 @@ export async function handleUpdateEmployee(req: Request, res: Response, next: Ne
   }
 
   try {
-    const employee = await updateEmployee(id, parsed.data);
+    const employee = await updateEmployee(id, parsed.data, req.lineUser!.companyId);
     res.json(employee);
   } catch (err) {
     next(err);
@@ -80,7 +80,7 @@ export async function handleDeleteEmployee(req: Request, res: Response, next: Ne
   }
 
   try {
-    const employee = await deleteEmployee(id);
+    const employee = await deleteEmployee(id, req.lineUser!.companyId);
     if (!employee) {
       res.status(404).json({ error: 'ไม่พบพนักงาน' });
       return;

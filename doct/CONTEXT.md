@@ -44,8 +44,14 @@
 - Period ใช้ `is_active boolean` ไม่ใช้ `status enum` — เปิด/ปิดงวดด้วย flag เดียว
 - "Active period" หมายถึง `is_active = true AND today BETWEEN start_date AND end_date`
 - tasks table ใช้ `employee_ids text` (comma-separated) — ใช้แทน work_logs ในการบันทึกงาน
-- Role management (`line_users` table) ยังไม่ implement ใน v1 (เพิ่มใน Phase 3)
-- ไม่ทำ multi-tenant ใน v1
+- Multi-tenant: `companies` table + `line_users` table (migration `0007_multi_tenant.sql`)
+  - `employees`, `periods`, `tasks` มี `company_id` FK → ข้อมูลแยกตาม company
+  - `line_users`: `line_user_id` (LINE string), `company_id` (nullable — ตั้งเองด้วย SQL), `role` (admin/user)
+  - AUTH: ทุก API request ต้องมี `X-Line-User-Id` header → middleware ตรวจ `line_users` → ถ้าไม่มี company_id reply 403
+  - LIFF: `liff.getProfile().userId` ถูก set เป็น `_lineUserId` ใน `src/lib/api.ts` และส่งเป็น header อัตโนมัติผ่าน `apiFetch`
+  - Report links ที่ share ผ่าน LINE ใช้ signed token ที่ฝัง `companyId` → bypass LINE user check (endpoint `/api/reports/access`)
+  - LINE webhook: check `line_users` ก่อน handle message ทุก event — ถ้าไม่มี company reply "กรุณาติดต่อ admin"
+  - ผูก user กับ company ด้วย SQL manual: `UPDATE line_users SET company_id = X WHERE line_user_id = 'U...'`
 - PDF report export ใช้ PDFKit + Sarabun font — implement แล้วใน Phase 1 (ก่อน schedule เดิม)
 
 ## Current Phase
@@ -65,6 +71,7 @@
 ### Database
 - [x] Migration `0002_rebuild_schema.sql` — employees, periods (is_active), attendance (unique constraint), tasks
 - [x] Migration `0006_attendance_leave_reason.sql` — เพิ่ม `leave_reason text` ใน attendance
+- [x] Migration `0007_multi_tenant.sql` — companies, line_users (role), company_id ใน employees/periods/tasks
 
 ### Employee Feature
 - [x] Employee repository (select, insert, update, softDelete)
@@ -110,6 +117,6 @@
 - [ ] LINE handler `>คำนวณ` → เลือกงวด → reply Flex สรุปยอด
 
 ### Phase 3 — Polish
-- [ ] LINE auth (line_users table + role guard)
+- [x] LINE auth — `line_users` table, `X-Line-User-Id` middleware, company guard ใน webhook
 - [ ] Wire LINE signature verification เป็น middleware จริง
 - [ ] Error handling UX polish (reply ภาษาไทย + help message)

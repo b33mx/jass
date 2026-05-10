@@ -34,7 +34,7 @@ export async function handleTriggerSummary(req: Request, res: Response, next: Ne
     return;
   }
   try {
-    await triggerSummary(date);
+    await triggerSummary(date, req.lineUser!.companyId);
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -48,7 +48,7 @@ export async function handleGetTasksForDate(req: Request, res: Response, next: N
     return;
   }
   try {
-    const tasks = await getTasksForDate(date);
+    const tasks = await getTasksForDate(date, req.lineUser!.companyId);
     res.json(tasks);
   } catch (err) {
     next(err);
@@ -65,10 +65,10 @@ export async function handleReplaceTasksForDate(req: Request, res: Response, nex
     return;
   }
   try {
-    const result = await replaceTasksForDate(parsed.data.date, parsed.data.tasks);
+    const result = await replaceTasksForDate(parsed.data.date, parsed.data.tasks, req.lineUser!.companyId);
     if (parsed.data.tasks.length > 0) {
       const { sendDailySummary } = await import('../../services/line/messages/daily-summary.js');
-      sendDailySummary(parsed.data.date, parsed.data.tasks).catch((err) => {
+      sendDailySummary(parsed.data.date, parsed.data.tasks, req.lineUser!.companyId).catch((err) => {
         console.error('[tasks] LINE daily summary failed:', err);
       });
     }
@@ -135,7 +135,7 @@ export async function handleCreateTasks(req: Request, res: Response, next: NextF
     return;
   }
   try {
-    const result = await createTasks(parsed.data.tasks);
+    const result = await createTasks(parsed.data.tasks, req.lineUser!.companyId);
     res.status(201).json(result);
   } catch (err) {
     next(err);

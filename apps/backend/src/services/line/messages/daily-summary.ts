@@ -16,8 +16,8 @@ function formatThaiDate(dateStr: string): string {
   });
 }
 
-export async function sendDailySummary(date: string, tasks: CreateTaskDto[]): Promise<void> {
-  const period = await selectActivePeriod(date);
+export async function sendDailySummary(date: string, tasks: CreateTaskDto[], companyId: number): Promise<void> {
+  const period = await selectActivePeriod(date, companyId);
   if (!period) {
     console.warn(`[daily-summary] no active period for ${date}; skip LINE`);
     return;
@@ -25,7 +25,7 @@ export async function sendDailySummary(date: string, tasks: CreateTaskDto[]): Pr
 
   const [attendance, employees] = await Promise.all([
     selectAttendanceByPeriodAndDate(period.period_id, date),
-    selectAllEmployees(),
+    selectAllEmployees(companyId),
   ]);
 
   const employeeMap = new Map(employees.map((e) => [e.employee_id, e.first_name]));
@@ -63,7 +63,7 @@ export async function sendDailySummary(date: string, tasks: CreateTaskDto[]): Pr
     taskLines,
   ].join('\n');
 
-  const token = createReportToken({ kind: 'daily', date });
+  const token = createReportToken({ kind: 'daily', date, companyId });
   const reportUrl = buildReportUrl(env.API_BASE_URL, token);
   const fullText = `${text}\n\n📄 รายงานประจำวัน\n${reportUrl}`;
 

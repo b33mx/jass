@@ -134,12 +134,12 @@ function drawTable(
   return y;
 }
 
-export async function generateDailyReport(date: string): Promise<Buffer> {
-  const period = await selectActivePeriod(date);
+export async function generateDailyReport(date: string, companyId: number): Promise<Buffer> {
+  const period = await selectActivePeriod(date, companyId);
   const [attendance, employees, tasks] = await Promise.all([
     period ? selectAttendanceByPeriodAndDate(period.period_id, date) : Promise.resolve([]),
-    selectAllEmployees(),
-    getTasksByDate(date),
+    selectAllEmployees(companyId),
+    getTasksByDate(date, companyId),
   ]);
 
   const empMap = new Map(employees.map((e) => [e.employee_id, `${e.first_name} ${e.last_name}`]));

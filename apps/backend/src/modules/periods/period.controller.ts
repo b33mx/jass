@@ -7,18 +7,18 @@ const createPeriodSchema = z.object({
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'รูปแบบวันที่ต้องเป็น YYYY-MM-DD'),
 }).refine((v) => v.end_date >= v.start_date, { message: 'วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น' });
 
-export async function handleGetAllPeriods(_req: Request, res: Response, next: NextFunction) {
+export async function handleGetAllPeriods(req: Request, res: Response, next: NextFunction) {
   try {
-    const periods = await getAllPeriods();
+    const periods = await getAllPeriods(req.lineUser!.companyId);
     res.json(periods);
   } catch (err) {
     next(err);
   }
 }
 
-export async function handleGetActivePeriod(_req: Request, res: Response, next: NextFunction) {
+export async function handleGetActivePeriod(req: Request, res: Response, next: NextFunction) {
   try {
-    const period = await getActivePeriod();
+    const period = await getActivePeriod(req.lineUser!.companyId);
     res.json({ period });
   } catch (err) {
     next(err);
@@ -32,7 +32,7 @@ export async function handleCalculatePayroll(req: Request, res: Response, next: 
     return;
   }
   try {
-    const result = await calculatePayroll(id);
+    const result = await calculatePayroll(id, req.lineUser!.companyId);
     res.json(result);
   } catch (err) {
     next(err);
@@ -47,7 +47,7 @@ export async function handleCreatePeriod(req: Request, res: Response, next: Next
   }
 
   try {
-    const period = await createPeriod(parsed.data);
+    const period = await createPeriod(parsed.data, req.lineUser!.companyId);
     res.status(201).json(period);
   } catch (err) {
     next(err);
@@ -61,7 +61,7 @@ export async function handleClosePeriod(req: Request, res: Response, next: NextF
     return;
   }
   try {
-    const period = await closePeriod(id);
+    const period = await closePeriod(id, req.lineUser!.companyId);
     res.json(period);
   } catch (err) {
     next(err);

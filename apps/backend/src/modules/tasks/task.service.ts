@@ -17,13 +17,16 @@ async function deleteStorageFiles(storagePaths: string[]): Promise<void> {
   if (error) console.error('[tasks] storage delete failed:', error.message);
 }
 
-export async function createTasks(dtos: CreateTaskDto[]): Promise<Task[]> {
+export async function createTasks(dtos: CreateTaskDto[], companyId: number): Promise<Task[]> {
   const inserted = await insertTasks(
     dtos.map((d) => ({
       task_date: d.task_date,
       task: d.task,
       detail: d.detail,
+      start_time: d.start_time,
+      end_time: d.end_time,
       employee_ids: d.employee_ids,
+      company_id: companyId,
     }))
   );
 
@@ -34,25 +37,25 @@ export async function createTasks(dtos: CreateTaskDto[]): Promise<Task[]> {
   );
 
   if (dtos.length > 0) {
-    sendDailySummary(dtos[0].task_date, dtos).catch((err) => {
+    sendDailySummary(dtos[0].task_date, dtos, companyId).catch((err) => {
       console.error('[tasks] LINE daily summary failed:', err);
     });
   }
 
-  return getTasksByDate(dtos[0].task_date);
+  return getTasksByDate(dtos[0].task_date, companyId);
 }
 
-export async function getTasksForDate(date: string): Promise<Task[]> {
-  return getTasksByDate(date);
+export async function getTasksForDate(date: string, companyId: number): Promise<Task[]> {
+  return getTasksByDate(date, companyId);
 }
 
-export async function replaceTasksForDate(date: string, dtos: CreateTaskDto[]): Promise<Task[]> {
-  const oldImages = await getTaskImagesByDate(date);
+export async function replaceTasksForDate(date: string, dtos: CreateTaskDto[], companyId: number): Promise<Task[]> {
+  const oldImages = await getTaskImagesByDate(date, companyId);
   const keptPaths = new Set(dtos.flatMap((d) => (d.images ?? []).map((img) => img.storage_path)));
   const toDelete = oldImages.filter((img) => !keptPaths.has(img.storage_path)).map((img) => img.storage_path);
 
   await deleteStorageFiles(toDelete);
-  await deleteTasksByDate(date);
+  await deleteTasksByDate(date, companyId);
 
   if (dtos.length === 0) return [];
 
@@ -61,7 +64,10 @@ export async function replaceTasksForDate(date: string, dtos: CreateTaskDto[]): 
       task_date: d.task_date,
       task: d.task,
       detail: d.detail,
+      start_time: d.start_time,
+      end_time: d.end_time,
       employee_ids: d.employee_ids,
+      company_id: companyId,
     }))
   );
 
@@ -71,9 +77,9 @@ export async function replaceTasksForDate(date: string, dtos: CreateTaskDto[]): 
     )
   );
 
-  return getTasksByDate(date);
+  return getTasksByDate(date, companyId);
 }
 
-export async function triggerSummary(date: string): Promise<void> {
-  await sendDailySummary(date, []);
+export async function triggerSummary(date: string, companyId: number): Promise<void> {
+  await sendDailySummary(date, [], companyId);
 }

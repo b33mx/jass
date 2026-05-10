@@ -105,14 +105,14 @@ function drawPresenceMark(doc: PDFKit.PDFDocument, cx: number, cy: number, prese
   doc.restore();
 }
 
-export async function generatePayrollPacketReport(periodId: number): Promise<Buffer> {
-  const period = await selectPeriodById(periodId);
+export async function generatePayrollPacketReport(periodId: number, companyId: number): Promise<Buffer> {
+  const period = await selectPeriodById(periodId, companyId);
   if (!period) throw Object.assign(new Error('ไม่พบงวด'), { status: 404 });
 
   const [allAtt, employees, tasks] = await Promise.all([
     selectAttendanceByPeriodId(periodId),
-    selectAllEmployees(),
-    getTasksByDateRange(period.start_date, period.end_date),
+    selectAllEmployees(companyId),
+    getTasksByDateRange(period.start_date, period.end_date, companyId),
   ]);
 
   const dates = datesInRange(period.start_date, period.end_date);
