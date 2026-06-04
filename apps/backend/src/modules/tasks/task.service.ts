@@ -17,7 +17,7 @@ async function deleteStorageFiles(storagePaths: string[]): Promise<void> {
   if (error) console.error('[tasks] storage delete failed:', error.message);
 }
 
-export async function createTasks(dtos: CreateTaskDto[], companyId: number): Promise<Task[]> {
+export async function createTasks(dtos: CreateTaskDto[], companyId: number, baseUrl?: string): Promise<Task[]> {
   const inserted = await insertTasks(
     dtos.map((d) => ({
       task_date: d.task_date,
@@ -37,7 +37,7 @@ export async function createTasks(dtos: CreateTaskDto[], companyId: number): Pro
   );
 
   if (dtos.length > 0) {
-    sendDailySummary(dtos[0].task_date, dtos, companyId).catch((err) => {
+    sendDailySummary(dtos[0].task_date, dtos, companyId, baseUrl).catch((err) => {
       console.error('[tasks] LINE daily summary failed:', err);
     });
   }
@@ -80,6 +80,6 @@ export async function replaceTasksForDate(date: string, dtos: CreateTaskDto[], c
   return getTasksByDate(date, companyId);
 }
 
-export async function triggerSummary(date: string, companyId: number): Promise<void> {
-  await sendDailySummary(date, [], companyId);
+export async function triggerSummary(date: string, companyId: number, baseUrl?: string): Promise<void> {
+  await sendDailySummary(date, [], companyId, baseUrl);
 }

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getAttendanceForDate, getMissingDates, saveAttendanceBatch } from '../api/attendance.api';
 import { getAllEmployees } from '../api/employee.api';
 import { getActivePeriod, type Period } from '../api/period.api';
+import { createReportLink } from '../api/report.api';
 
 function NoPeriodState() {
   const navigate = useNavigate();
@@ -94,6 +95,7 @@ export function AttendancePage() {
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [downloadingReport, setDownloadingReport] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
 
   useEffect(() => {
@@ -255,20 +257,37 @@ export function AttendancePage() {
         .filter((r) => r.morning_check || r.afternoon_check)
         .map((r) => ({ employee_id: r.employee_id, name: r.name }));
       const remaining = missingDates.filter((d) => d !== selectedDate);
+      const taskFlowState = {
+        date: selectedDate,
+        employees: checkedIn,
+        period: { start_date: period.start_date, end_date: period.end_date },
+        remainingCount: remaining.length,
+        fromOverview: !!state?.date,
+      };
+
+      // Keep a durable fallback for WebView/Liff cases where route state can be lost.
+      sessionStorage.setItem('createTasksState', JSON.stringify(taskFlowState));
 
       navigate('/tasks/new', {
-        state: {
-          date: selectedDate,
-          employees: checkedIn,
-          period: { start_date: period.start_date, end_date: period.end_date },
-          remainingCount: remaining.length,
-          fromOverview: !!state?.date,
-        },
+        state: taskFlowState,
       });
     } catch (err) {
       setToast({ type: 'error', message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่' });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDownloadDailyReport() {
+    if (!selectedDate) return;
+    setDownloadingReport(true);
+    try {
+      const reportUrl = await createReportLink({ kind: 'daily', date: selectedDate });
+      window.open(reportUrl, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setToast({ type: 'error', message: err instanceof Error ? err.message : 'ไม่สามารถเปิดรายงานได้' });
+    } finally {
+      setDownloadingReport(false);
     }
   }
 
@@ -465,16 +484,17 @@ export function AttendancePage() {
               )}
 
               {selectedDate && (
-                <a
-                  href={`/api/reports/daily?date=${selectedDate}`}
-                  download={`รายงาน-${selectedDate}.pdf`}
+                <button
+                  type="button"
+                  onClick={handleDownloadDailyReport}
+                  disabled={downloadingReport}
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 py-3 text-sm font-medium text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-700"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                   </svg>
-                  ดาวน์โหลดรายงานประจำวัน
-                </a>
+                  {downloadingReport ? 'กำลังเปิดรายงาน...' : 'ดาวน์โหลดรายงานประจำวัน'}
+                </button>
               )}
             </div>
           )}

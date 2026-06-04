@@ -1,4 +1,13 @@
-import { closePeriodById, insertPeriod, selectActivePeriod, selectAllPeriods, selectOverlappingPeriod, selectPeriodById } from './period.repository.js';
+import {
+  closePeriodById,
+  insertPeriod,
+  selectActivePeriod,
+  selectAllPeriods,
+  selectOverlappingPeriod,
+  selectPeriodById,
+  softDeletePeriodById,
+  updatePeriodDates,
+} from './period.repository.js';
 import { selectAttendanceByPeriodId } from '../attendance/attendance.repository.js';
 import { selectAllEmployees } from '../employees/employee.repository.js';
 import type { CreatePeriodDto, PayrollResult, Period } from './period.types.js';
@@ -18,6 +27,31 @@ export async function createPeriod(dto: CreatePeriodDto, companyId: number): Pro
     throw err;
   }
   return insertPeriod({ start_date: dto.start_date, end_date: dto.end_date, company_id: companyId });
+}
+
+export async function updatePeriod(
+  periodId: number,
+  dto: CreatePeriodDto,
+  companyId: number,
+): Promise<Period> {
+  const period = await getPeriodById(periodId, companyId);
+  if (!period) throw Object.assign(new Error('ไม่พบงวด'), { status: 404 });
+
+  const overlap = await selectOverlappingPeriod(dto.start_date, dto.end_date, companyId, periodId);
+  if (overlap) {
+    const err = Object.assign(
+      new Error(`วันที่ทับซ้อนกับงวด ${overlap.start_date} – ${overlap.end_date}`),
+      { status: 409 },
+    );
+    throw err;
+  }
+  return updatePeriodDates(periodId, companyId, dto.start_date, dto.end_date);
+}
+
+export async function deletePeriod(periodId: number, companyId: number): Promise<Period> {
+  const period = await getPeriodById(periodId, companyId);
+  if (!period) throw Object.assign(new Error('ไม่พบงวด'), { status: 404 });
+  return softDeletePeriodById(periodId, companyId);
 }
 
 export async function getPeriodById(id: number, companyId?: number): Promise<Period | null> {

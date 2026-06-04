@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createReportLink } from '../api/report.api';
 
 function formatThaiDate(dateStr: string): string {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('th-TH', {
@@ -15,8 +16,21 @@ export function WorkReportPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }, []);
   const [date, setDate] = useState(today);
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const downloadUrl = `/api/reports/work?date=${date}`;
+  async function handleDownload() {
+    setDownloading(true);
+    setError(null);
+    try {
+      const reportUrl = await createReportLink({ kind: 'work', date });
+      window.open(reportUrl, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ไม่สามารถเปิดรายงานได้');
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-md">
@@ -49,12 +63,16 @@ export function WorkReportPage() {
             <p className="mt-2 text-xs text-zinc-500">{formatThaiDate(date)}</p>
           </div>
 
-          <a
-            href={downloadUrl}
+          {error && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={downloading}
             className="inline-flex w-full items-center justify-center rounded-2xl bg-brandRed px-4 py-3 text-sm font-bold text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 active:scale-[0.98]"
           >
-            ดาวน์โหลดรายงาน PDF
-          </a>
+            {downloading ? 'กำลังเปิดรายงาน...' : 'ดาวน์โหลดรายงาน PDF'}
+          </button>
         </div>
       </div>
     </div>

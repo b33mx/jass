@@ -8,6 +8,11 @@ const employeeSchema = z.object({
   wage: z.number().positive('ค่าแรงต้องมากกว่า 0'),
 });
 
+const updateNameSchema = z.object({
+  firstName: z.string().min(1, 'ต้องระบุชื่อ'),
+  lastName: z.string().min(1, 'ต้องระบุนามสกุล'),
+});
+
 export async function handleGetAllEmployees(req: Request, res: Response, next: NextFunction) {
   try {
     const employees = await getAllEmployees(req.lineUser!.companyId);
@@ -58,7 +63,7 @@ export async function handleUpdateEmployee(req: Request, res: Response, next: Ne
     return;
   }
 
-  const parsed = employeeSchema.safeParse(req.body);
+  const parsed = updateNameSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten().fieldErrors });
     return;

@@ -5,6 +5,7 @@ import { generateTimecardReport } from './report.timecard.service.js';
 import { generatePayrollPacketReport } from './report.payroll-packet.service.js';
 import { env } from '../../config/env.js';
 import { buildReportUrl, createReportToken, parseReportToken, type ReportKind } from './report-link-token.js';
+import { getPublicBaseUrl } from '../../lib/public-url.js';
 
 function todayInTimezone(timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -182,7 +183,7 @@ export async function handleCreateReportLink(req: Request, res: Response) {
     periodId: kind === 'timecard' || kind === 'payroll-packet' ? periodId : undefined,
     companyId: req.lineUser!.companyId,
   });
-  const url = buildReportUrl(env.API_BASE_URL, token);
+  const url = buildReportUrl(getPublicBaseUrl(), token);
   res.json({ token, url });
 }
 

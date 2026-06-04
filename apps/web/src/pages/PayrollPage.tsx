@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { calculatePayroll, closePeriod, getAllPeriods, type Period } from '../api/period.api';
+import { createReportLink } from '../api/report.api';
 
 function shortDate(dateStr: string): string {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('th-TH', {
@@ -74,15 +75,25 @@ export function PayrollPage() {
   }
 
   async function onCopyReportLink(period: Period) {
-    const reportUrl = `${window.location.origin}/api/reports/payroll-packet?period_id=${period.period_id}`;
-    const text = `สวัสดีค่า 😊\nรายงานเงินเดือนงวดวันที่ ${shortDate(period.start_date)} - ${shortDate(period.end_date)} พร้อมแล้วนะคะ ✨\nกดดูรายงานได้ที่ลิงก์นี้เลยค่ะ 🔗\n${reportUrl}`;
     try {
+      const reportUrl = await createReportLink({ kind: 'payroll-packet', period_id: period.period_id });
+      const text = `สวัสดีค่า 😊\nรายงานเงินเดือนงวดวันที่ ${shortDate(period.start_date)} - ${shortDate(period.end_date)} พร้อมแล้วนะคะ ✨\nกดดูรายงานได้ที่ลิงก์นี้เลยค่ะ 🔗\n${reportUrl}`;
       await navigator.clipboard.writeText(text);
       setCopySuccess('คัดลอกลิงก์รายงานแล้ว');
       window.setTimeout(() => setCopySuccess(null), 1800);
-    } catch {
-      setCopySuccess('คัดลอกไม่สำเร็จ');
+    } catch (err) {
+      setCopySuccess(err instanceof Error ? err.message : 'คัดลอกไม่สำเร็จ');
       window.setTimeout(() => setCopySuccess(null), 1800);
+    }
+  }
+
+  async function onOpenReport(period: Period) {
+    try {
+      setError(null);
+      const reportUrl = await createReportLink({ kind: 'payroll-packet', period_id: period.period_id });
+      window.open(reportUrl, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ไม่สามารถเปิดรายงานได้');
     }
   }
 
@@ -153,7 +164,7 @@ export function PayrollPage() {
             <div className="mt-3 space-y-2">
               <button
                 type="button"
-                onClick={() => window.open(`/api/reports/payroll-packet?period_id=${selectedPeriod.period_id}`, '_blank', 'noopener,noreferrer')}
+                onClick={() => onOpenReport(selectedPeriod)}
                 className="w-full rounded-xl border border-brandRed/30 bg-white px-3 py-3 text-left transition hover:bg-rose-50"
               >
                 <p className="text-sm font-bold text-brandRed">ดูรายงานเงินเดือน</p>

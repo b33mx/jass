@@ -29,6 +29,28 @@ interface LocationState {
   fromOverview?: boolean;
 }
 
+function readTaskFlowState(): LocationState | null {
+  try {
+    const raw = sessionStorage.getItem('createTasksState');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LocationState>;
+    if (!parsed?.date || !parsed?.period?.start_date || !parsed?.period?.end_date) return null;
+    return {
+      date: parsed.date,
+      employees: Array.isArray(parsed.employees) ? parsed.employees : [],
+      period: parsed.period,
+      remainingCount: typeof parsed.remainingCount === 'number' ? parsed.remainingCount : 0,
+      fromOverview: !!parsed.fromOverview,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearTaskFlowState(): void {
+  sessionStorage.removeItem('createTasksState');
+}
+
 function emptyEntry(): TaskEntry {
   return {
     task: '',
@@ -170,7 +192,8 @@ function EmployeeMultiSelect({
 
 export function CreateTasksPage() {
   const navigate = useNavigate();
-  const { state } = useLocation() as { state: LocationState | null };
+  const { state: routeState } = useLocation() as { state: LocationState | null };
+  const state = routeState ?? readTaskFlowState();
 
   const [entries, setEntries] = useState<TaskEntry[]>(() =>
     state?.employees?.length === 0 ? [] : [emptyEntry()]
@@ -182,7 +205,10 @@ export function CreateTasksPage() {
   const [showBackConfirm, setShowBackConfirm] = useState(false);
 
   useEffect(() => {
-    if (!state?.date) navigate('/attendance', { replace: true });
+    if (!state?.date) {
+      clearTaskFlowState();
+      navigate('/attendance', { replace: true });
+    }
   }, [state, navigate]);
 
   useEffect(() => {
@@ -266,6 +292,7 @@ export function CreateTasksPage() {
         triggerDailySummary(date).catch((err) => {
           console.error('[tasks] triggerDailySummary failed:', err);
         });
+        clearTaskFlowState();
         setSaved(true);
         return;
       }
@@ -289,6 +316,7 @@ export function CreateTasksPage() {
       } else {
         await createTasks(payload);
       }
+      clearTaskFlowState();
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่');
@@ -334,7 +362,10 @@ export function CreateTasksPage() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => navigate('/')}
+                  onClick={() => {
+                    clearTaskFlowState();
+                    navigate('/');
+                  }}
                   className="mt-6 w-full rounded-2xl bg-brandRed py-4 text-sm font-bold tracking-wide text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 active:scale-[0.98]"
                 >
                   กลับหน้าหลัก
@@ -355,7 +386,10 @@ export function CreateTasksPage() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => navigate('/attendance')}
+                  onClick={() => {
+                    clearTaskFlowState();
+                    navigate('/attendance');
+                  }}
                   className="mt-6 w-full rounded-2xl bg-brandRed py-4 text-sm font-bold tracking-wide text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 active:scale-[0.98]"
                 >
                   ลงเวลาวันถัดไป
@@ -645,6 +679,7 @@ export function CreateTasksPage() {
               triggerDailySummary(date).catch((err) => {
                 console.error('[tasks] triggerDailySummary failed:', err);
               });
+              clearTaskFlowState();
               navigate('/attendance');
             }}
             className="mt-2.5 w-full rounded-2xl py-3 text-sm font-medium text-zinc-400 transition hover:text-zinc-600"
@@ -682,6 +717,7 @@ export function CreateTasksPage() {
                       triggerDailySummary(date).catch((err) => {
                         console.error('[tasks] triggerDailySummary failed:', err);
                       });
+                      clearTaskFlowState();
                       navigate('/attendance');
                     }}
                     className="w-full rounded-2xl py-3 text-sm font-medium text-zinc-400 transition hover:text-zinc-600"

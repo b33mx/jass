@@ -4,4 +4,5 @@ export interface Period {
   end_date: string;
   is_active: boolean;
   created_at: string;
+  deleted_at: string | null;
 }

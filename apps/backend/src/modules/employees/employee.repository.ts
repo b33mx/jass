@@ -47,7 +47,7 @@ export async function selectEmployeeById(id: number, companyId: number): Promise
 export async function updateEmployeeById(
   id: number,
   companyId: number,
-  data: { first_name: string; last_name: string; wage: number; ot_rate: number }
+  data: { first_name: string; last_name: string }
 ): Promise<Employee> {
   const { data: employee, error } = await supabase
     .from('employees')
@@ -59,6 +59,20 @@ export async function updateEmployeeById(
 
   if (error) throw new Error(error.message);
   return employee as Employee;
+}
+
+export async function updateEmployeeWage(
+  id: number,
+  companyId: number,
+  wage: number,
+  ot_rate: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('employees')
+    .update({ wage, ot_rate })
+    .eq('employee_id', id)
+    .eq('company_id', companyId);
+  if (error) throw new Error(error.message);
 }
 
 export async function softDeleteEmployeeById(id: number, companyId: number): Promise<Employee | null> {

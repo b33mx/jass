@@ -1,6 +1,6 @@
 import type { LineMessage } from '../types.js';
 
-export function createAttendanceFlexMessage(liffId: string, apiBaseUrl: string): LineMessage {
+export function createAttendanceFlexMessage(liffId: string, currentWorkReportUrl: string): LineMessage {
   const liffBase = `https://liff.line.me/${liffId}`;
 
   return {
@@ -43,7 +43,7 @@ export function createAttendanceFlexMessage(liffId: string, apiBaseUrl: string):
             action: {
               type: 'uri',
               label: 'รายงานการทำงานงวดปัจจุบัน',
-              uri: `${apiBaseUrl}/api/reports/work/current`,
+              uri: currentWorkReportUrl,
             },
           },
         ],

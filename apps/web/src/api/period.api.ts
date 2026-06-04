@@ -1,4 +1,4 @@
-import { apiFetch } from '../lib/api.ts';
+import { apiFetch } from '../lib/api';
 
 export interface Period {
   period_id: number;
@@ -6,6 +6,7 @@ export interface Period {
   end_date: string;
   is_active: boolean;
   created_at: string;
+  deleted_at: string | null;
 }
 
 export interface CreatePeriodPayload {
@@ -80,4 +81,25 @@ export async function closePeriod(periodId: number): Promise<Period> {
     throw new Error(body.error ?? 'ไม่สามารถปิดงวดได้');
   }
   return res.json() as Promise<Period>;
+}
+
+export async function updatePeriod(periodId: number, payload: CreatePeriodPayload): Promise<Period> {
+  const res = await apiFetch(`/api/periods/${periodId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? 'ไม่สามารถแก้ไขงวดได้');
+  }
+  return res.json() as Promise<Period>;
+}
+
+export async function deletePeriod(periodId: number): Promise<void> {
+  const res = await apiFetch(`/api/periods/${periodId}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? 'ไม่สามารถลบงวดได้');
+  }
 }

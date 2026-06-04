@@ -1,22 +1,27 @@
 import { env } from '../../config/env.js';
 import type { LineMessage } from './types.js';
 
-export async function broadcastToLine(messages: LineMessage[]): Promise<void> {
+// multicast: ส่งเฉพาะ user ที่ผูกกับ company นั้น (max 500 per call)
+export async function multicastToLine(userIds: string[], messages: LineMessage[]): Promise<void> {
   if (!env.LINE_CHANNEL_ACCESS_TOKEN) {
-    console.warn('[line] LINE_CHANNEL_ACCESS_TOKEN not configured; skip broadcast');
+    console.warn('[line] LINE_CHANNEL_ACCESS_TOKEN not configured; skip multicast');
     return;
   }
-  const response = await fetch('https://api.line.me/v2/bot/message/broadcast', {
+  if (userIds.length === 0) {
+    console.warn('[line] no recipients; skip multicast');
+    return;
+  }
+  const response = await fetch('https://api.line.me/v2/bot/message/multicast', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN}`,
     },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ to: userIds, messages }),
   });
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`LINE broadcast failed (${response.status}): ${errorBody}`);
+    throw new Error(`LINE multicast failed (${response.status}): ${errorBody}`);
   }
 }
 

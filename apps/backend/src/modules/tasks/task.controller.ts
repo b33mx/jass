@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { supabase } from '../../lib/supabase.js';
 import { createTasks, getTasksForDate, replaceTasksForDate, triggerSummary } from './task.service.js';
+import { getPublicBaseUrl } from '../../lib/public-url.js';
 
 const STORAGE_BUCKET = 'task-images';
 const MAX_IMAGES = 5;
@@ -34,7 +35,7 @@ export async function handleTriggerSummary(req: Request, res: Response, next: Ne
     return;
   }
   try {
-    await triggerSummary(date, req.lineUser!.companyId);
+    await triggerSummary(date, req.lineUser!.companyId, getPublicBaseUrl());
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -68,7 +69,7 @@ export async function handleReplaceTasksForDate(req: Request, res: Response, nex
     const result = await replaceTasksForDate(parsed.data.date, parsed.data.tasks, req.lineUser!.companyId);
     if (parsed.data.tasks.length > 0) {
       const { sendDailySummary } = await import('../../services/line/messages/daily-summary.js');
-      sendDailySummary(parsed.data.date, parsed.data.tasks, req.lineUser!.companyId).catch((err) => {
+      sendDailySummary(parsed.data.date, parsed.data.tasks, req.lineUser!.companyId, getPublicBaseUrl()).catch((err) => {
         console.error('[tasks] LINE daily summary failed:', err);
       });
     }
@@ -135,7 +136,7 @@ export async function handleCreateTasks(req: Request, res: Response, next: NextF
     return;
   }
   try {
-    const result = await createTasks(parsed.data.tasks, req.lineUser!.companyId);
+    const result = await createTasks(parsed.data.tasks, req.lineUser!.companyId, getPublicBaseUrl());
     res.status(201).json(result);
   } catch (err) {
     next(err);

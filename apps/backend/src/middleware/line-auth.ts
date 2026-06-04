@@ -9,6 +9,7 @@ export async function lineAuthMiddleware(req: Request, res: Response, next: Next
 
   const lineUserId = req.headers['x-line-user-id'];
 
+  console.log("Beem : " , lineUserId)
   if (!lineUserId || typeof lineUserId !== 'string') {
     res.status(401).json({ error: 'กรุณาเปิดผ่าน LINE' });
     return;
@@ -16,6 +17,7 @@ export async function lineAuthMiddleware(req: Request, res: Response, next: Next
 
   try {
     const user = await getLineUserByLineId(lineUserId);
+    console.log("Beem: ",lineUserId)
 
     if (!user) {
       res.status(403).json({ error: 'ไม่พบผู้ใช้ในระบบ' });

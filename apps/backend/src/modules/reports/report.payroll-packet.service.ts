@@ -4,9 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { selectPeriodById } from '../periods/period.repository.js';
 import { selectAttendanceByPeriodId } from '../attendance/attendance.repository.js';
 import { selectAllEmployees } from '../employees/employee.repository.js';
+import { selectWageHistoryForEmployees } from '../wage-history/wage-history.repository.js';
 import { getTasksByDateRange } from '../tasks/task.repository.js';
 import type { Attendance } from '../../models/attendance.model.js';
 import type { Task } from '../../models/task.model.js';
+import type { WageHistory } from '../wage-history/wage-history.types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FONT = path.resolve(__dirname, '../../../assets/fonts/Sarabun-Regular.ttf');
@@ -54,6 +56,30 @@ function datesInRange(start: string, end: string): string[] {
 
 function thb(n: number): string {
   return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function buildWageHistoryMap(history: WageHistory[]): Map<number, WageHistory[]> {
+  const map = new Map<number, WageHistory[]>();
+  for (const h of history) {
+    if (!map.has(h.employee_id)) map.set(h.employee_id, []);
+    map.get(h.employee_id)!.push(h);
+  }
+  // each list is already ASC by effective_from from the query
+  return map;
+}
+
+function getEffectiveRate(
+  map: Map<number, WageHistory[]>,
+  employeeId: number,
+  date: string,
+): { wage: number; ot_rate: number } {
+  const history = map.get(employeeId) ?? [];
+  let effective = history[0];
+  for (const h of history) {
+    if (h.effective_from <= date) effective = h;
+    else break;
+  }
+  return effective ?? { wage: 0, ot_rate: 0 };
 }
 
 async function fetchBuffer(url: string): Promise<Buffer | null> {
@@ -115,6 +141,12 @@ export async function generatePayrollPacketReport(periodId: number, companyId: n
     getTasksByDateRange(period.start_date, period.end_date, companyId),
   ]);
 
+  const wageHistoryRaw = await selectWageHistoryForEmployees(
+    employees.map((e) => e.employee_id),
+    companyId,
+  );
+  const wageHistoryMap = buildWageHistoryMap(wageHistoryRaw);
+
   const dates = datesInRange(period.start_date, period.end_date);
   const periodLabel = `งวด ${formatThaiDate(period.start_date)} - ${formatThaiDate(period.end_date)}`;
 
@@ -162,7 +194,11 @@ export async function generatePayrollPacketReport(periodId: number, companyId: n
       const records = Array.from((attLookup.get(emp.employee_id) ?? new Map()).values());
       const daysWorked = records.reduce((sum, r) => sum + (r.morning_check ? 0.5 : 0) + (r.afternoon_check ? 0.5 : 0), 0);
       const otHours = records.reduce((sum, r) => sum + (r.ot ?? 0), 0);
-      const gross = daysWorked * emp.wage + otHours * emp.ot_rate;
+      const gross = records.reduce((sum, r) => {
+        const rate = getEffectiveRate(wageHistoryMap, emp.employee_id, r.attendance_date);
+        const labor = (r.morning_check ? 0.5 : 0) + (r.afternoon_check ? 0.5 : 0);
+        return sum + labor * rate.wage + (r.ot ?? 0) * rate.ot_rate;
+      }, 0);
       grandTotal += gross;
 
       if (idx % 2 === 1) doc.fillColor(C.stripe).rect(M, y, CW, rowH).fill();
@@ -256,9 +292,16 @@ export async function generatePayrollPacketReport(periodId: number, companyId: n
       const records = Array.from((attLookup.get(emp.employee_id) ?? new Map()).values());
       const sumDays = records.reduce((sum, r) => sum + (r.morning_check ? 0.5 : 0) + (r.afternoon_check ? 0.5 : 0), 0);
       const sumOt = records.reduce((sum, r) => sum + (r.ot ?? 0), 0);
-      const wagePay = sumDays * emp.wage;
-      const otPay = sumOt * emp.ot_rate;
-      const sumPay = sumDays * emp.wage + sumOt * emp.ot_rate;
+      const wagePay = records.reduce((sum, r) => {
+        const rate = getEffectiveRate(wageHistoryMap, emp.employee_id, r.attendance_date);
+        const labor = (r.morning_check ? 0.5 : 0) + (r.afternoon_check ? 0.5 : 0);
+        return sum + labor * rate.wage;
+      }, 0);
+      const otPay = records.reduce((sum, r) => {
+        const rate = getEffectiveRate(wageHistoryMap, emp.employee_id, r.attendance_date);
+        return sum + (r.ot ?? 0) * rate.ot_rate;
+      }, 0);
+      const sumPay = wagePay + otPay;
 
       if (ty + 46 > PAGE_H - M) {
         doc.addPage();

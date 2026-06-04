@@ -1,15 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { deleteEmployee, getEmployeeById, updateEmployee } from '../api/employee.api';
+import {
+  deleteEmployee,
+  getEmployeeById,
+  updateEmployee,
+  getWageHistory,
+  addWageHistory,
+  type Employee,
+  type WageHistory,
+} from '../api/employee.api';
 
-type FieldErrors = { firstName?: string; lastName?: string; wage?: string };
+type FieldErrors = { firstName?: string; lastName?: string };
 type Toast = { type: 'success' | 'error'; message: string } | null;
+type WageModalErrors = { wage?: string; effectiveFrom?: string };
+
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatThaiDate(dateStr: string): string {
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
+}
 
 export function EditEmployeePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ firstName: '', lastName: '', wage: '' });
+  const [form, setForm] = useState({ firstName: '', lastName: '' });
+  const [employee, setEmployee] = useState<Employee | null>(null);
   const [originalName, setOriginalName] = useState('');
   const [loadingData, setLoadingData] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -21,19 +41,24 @@ export function EditEmployeePage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const wage = parseFloat(form.wage) || 0;
-  const otRate = wage > 0 ? (wage / 8) * 1.5 : null;
+  const [wageHistory, setWageHistory] = useState<WageHistory[]>([]);
+  const [showWageModal, setShowWageModal] = useState(false);
+  const [wageForm, setWageForm] = useState({ wage: '', effectiveFrom: toLocalDateStr(new Date()), note: '' });
+  const [wageModalErrors, setWageModalErrors] = useState<WageModalErrors>({});
+  const [savingWage, setSavingWage] = useState(false);
+
+  const wagePreview = parseFloat(wageForm.wage) || 0;
+  const wageOtPreview = wagePreview > 0 ? (wagePreview / 8) * 1.5 : null;
 
   useEffect(() => {
     if (!id) return;
-    getEmployeeById(parseInt(id, 10))
-      .then((emp) => {
-        setForm({
-          firstName: emp.first_name,
-          lastName: emp.last_name,
-          wage: String(emp.wage),
-        });
+    const empId = parseInt(id, 10);
+    Promise.all([getEmployeeById(empId), getWageHistory(empId)])
+      .then(([emp, history]) => {
+        setEmployee(emp);
+        setForm({ firstName: emp.first_name, lastName: emp.last_name });
         setOriginalName(`${emp.first_name} ${emp.last_name}`);
+        setWageHistory(history);
       })
       .catch((err) => setFetchError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด'))
       .finally(() => setLoadingData(false));
@@ -57,9 +82,40 @@ export function EditEmployeePage() {
     const errs: FieldErrors = {};
     if (!form.firstName.trim()) errs.firstName = 'กรุณากรอกชื่อจริง';
     if (!form.lastName.trim()) errs.lastName = 'กรุณากรอกนามสกุล';
-    if (!form.wage || parseFloat(form.wage) <= 0) errs.wage = 'กรุณากรอกค่าแรงที่ถูกต้อง';
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
+  }
+
+  function validateWageModal(): boolean {
+    const errs: WageModalErrors = {};
+    if (!wageForm.wage || parseFloat(wageForm.wage) <= 0) errs.wage = 'กรุณากรอกค่าแรงที่ถูกต้อง';
+    if (!wageForm.effectiveFrom) errs.effectiveFrom = 'กรุณาเลือกวันที่มีผล';
+    setWageModalErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
+
+  async function handleSaveWage() {
+    if (!id || !validateWageModal()) return;
+    setSavingWage(true);
+    try {
+      const newRecord = await addWageHistory(parseInt(id, 10), {
+        wage: parseFloat(wageForm.wage),
+        effectiveFrom: wageForm.effectiveFrom,
+        note: wageForm.note.trim() || undefined,
+      });
+      setWageHistory((prev) => [newRecord, ...prev].sort((a, b) => b.effective_from.localeCompare(a.effective_from)));
+      // อัพเดต employee.wage ถ้า record ใหม่คือล่าสุด
+      if (employee && newRecord.effective_from >= (wageHistory[0]?.effective_from ?? '')) {
+        setEmployee((prev) => prev ? { ...prev, wage: newRecord.wage, ot_rate: newRecord.ot_rate } : prev);
+      }
+      setShowWageModal(false);
+      setWageForm({ wage: '', effectiveFrom: toLocalDateStr(new Date()), note: '' });
+      setToast({ type: 'success', message: 'บันทึกค่าแรงใหม่สำเร็จ!' });
+    } catch (err) {
+      setToast({ type: 'error', message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาด' });
+    } finally {
+      setSavingWage(false);
+    }
   }
 
   function handleConfirmClick() {
@@ -77,7 +133,6 @@ export function EditEmployeePage() {
       await updateEmployee(parseInt(id, 10), {
         firstName: form.firstName,
         lastName: form.lastName,
-        wage: parseFloat(form.wage),
       });
       setShowConfirm(false);
       setToast({ type: 'success', message: 'แก้ไขข้อมูลสำเร็จ!' });
@@ -200,48 +255,62 @@ export function EditEmployeePage() {
 
             <div className="my-5 border-t border-zinc-100" />
 
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">ค่าตอบแทน</p>
-            <Field label="ค่าแรง" required hint="บาท / วัน" error={fieldErrors.wage}>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-zinc-400">฿</span>
-                <input
-                  name="wage"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.wage}
-                  onChange={handleChange}
-                  placeholder="0"
-                  className={`${inputCls(!!fieldErrors.wage)} pl-8`}
-                />
-                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400">/ วัน</span>
-              </div>
-            </Field>
+            {/* ค่าแรงปัจจุบัน */}
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">ค่าตอบแทน</p>
+              <button
+                type="button"
+                onClick={() => setShowWageModal(true)}
+                className="flex items-center gap-1.5 rounded-xl bg-brandRed px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-brandRed/30 transition hover:opacity-90 active:scale-[0.98]"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                ปรับค่าแรง
+              </button>
+            </div>
 
-            {/* OT card */}
-            <div className="mt-4 flex items-center justify-between rounded-2xl bg-amber-50 px-5 py-4 ring-1 ring-amber-100">
+            <div className="mt-3 flex items-center justify-between rounded-2xl bg-zinc-50 px-5 py-4 ring-1 ring-zinc-100">
               <div>
-                <div className="flex items-center gap-2">
-                  <svg className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-sm font-semibold text-amber-700">อัตรา OT</span>
-                </div>
-                <p className="mt-1 text-xs text-amber-500/80">คำนวณอัตโนมัติ · ค่าแรง ÷ 8 × 1.5</p>
+                <p className="text-xs text-zinc-400">ค่าแรงปัจจุบัน</p>
+                <p className="mt-0.5 text-2xl font-black tabular-nums text-zinc-800">
+                  {employee ? employee.wage.toLocaleString('th-TH', { minimumFractionDigits: 0 }) : '—'}
+                </p>
+                <p className="text-[11px] text-zinc-400">บาท / วัน</p>
               </div>
               <div className="text-right">
-                {otRate !== null ? (
-                  <>
-                    <p className="text-2xl font-black tabular-nums text-brandRed">
-                      {otRate.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-[11px] text-zinc-400">บาท / ชม.</p>
-                  </>
-                ) : (
-                  <p className="text-xl font-black text-zinc-300">—</p>
-                )}
+                <p className="text-xs text-zinc-400">อัตรา OT</p>
+                <p className="mt-0.5 text-xl font-black tabular-nums text-amber-600">
+                  {employee ? employee.ot_rate.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '—'}
+                </p>
+                <p className="text-[11px] text-zinc-400">บาท / ชม.</p>
               </div>
             </div>
+
+            {/* ประวัติค่าแรง */}
+            {wageHistory.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">ประวัติค่าแรง</p>
+                <div className="divide-y divide-zinc-100 overflow-hidden rounded-2xl ring-1 ring-zinc-100">
+                  {wageHistory.map((h, i) => (
+                    <div key={h.id} className={`flex items-center justify-between px-4 py-3 ${i === 0 ? 'bg-amber-50/60' : 'bg-white'}`}>
+                      <div>
+                        <p className="text-xs font-semibold text-zinc-700">{formatThaiDate(h.effective_from)}</p>
+                        {h.note && <p className="mt-0.5 text-[11px] text-zinc-400">{h.note}</p>}
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-sm font-bold tabular-nums ${i === 0 ? 'text-brandRed' : 'text-zinc-600'}`}>
+                          {h.wage.toLocaleString('th-TH', { minimumFractionDigits: 0 })} บาท/วัน
+                        </p>
+                        <p className="text-[11px] text-zinc-400">
+                          OT {h.ot_rate.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท/ชม.
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Toast */}
             {toast && (
@@ -313,7 +382,9 @@ export function EditEmployeePage() {
                 <p className="text-sm font-semibold text-zinc-800">
                   {form.firstName} {form.lastName}
                 </p>
-                <p className="mt-0.5 text-xs text-zinc-400">ค่าแรง: {wage.toLocaleString('th-TH')} บาท / วัน</p>
+                {employee && (
+                  <p className="mt-0.5 text-xs text-zinc-400">ค่าแรง: {employee.wage.toLocaleString('th-TH')} บาท / วัน</p>
+                )}
               </div>
 
               <div className="mt-5 flex gap-3">
@@ -336,6 +407,105 @@ export function EditEmployeePage() {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Wage Modal */}
+      {showWageModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => !savingWage && setShowWageModal(false)}
+          />
+          <div className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-xl" style={{ maxWidth: 'calc(100vw - 2rem)' }}>
+            <div className="bg-brandRed px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                  <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">ปรับค่าแรง</h2>
+                  <p className="text-xs text-white/60">{originalName}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <Field label="ค่าแรงใหม่" required hint="บาท / วัน" error={wageModalErrors.wage}>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-zinc-400">฿</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={wageForm.wage}
+                    onChange={(e) => {
+                      setWageForm((p) => ({ ...p, wage: e.target.value }));
+                      if (wageModalErrors.wage) setWageModalErrors((p) => ({ ...p, wage: undefined }));
+                    }}
+                    placeholder="0"
+                    className={`${inputCls(!!wageModalErrors.wage)} pl-8`}
+                  />
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-400">/ วัน</span>
+                </div>
+              </Field>
+
+              {wageOtPreview !== null && (
+                <div className="flex items-center justify-between rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-100">
+                  <span className="text-xs font-semibold text-amber-700">OT (คำนวณอัตโนมัติ)</span>
+                  <span className="text-sm font-black tabular-nums text-brandRed">
+                    {wageOtPreview.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท/ชม.
+                  </span>
+                </div>
+              )}
+
+              <Field label="มีผลตั้งแต่วันที่" required error={wageModalErrors.effectiveFrom}>
+                <div className="w-full overflow-hidden">
+                  <input
+                    type="date"
+                    value={wageForm.effectiveFrom}
+                    onChange={(e) => {
+                      setWageForm((p) => ({ ...p, effectiveFrom: e.target.value }));
+                      if (wageModalErrors.effectiveFrom) setWageModalErrors((p) => ({ ...p, effectiveFrom: undefined }));
+                    }}
+                    style={{ WebkitAppearance: 'none', width: '100%', boxSizing: 'border-box' }}
+                    className={inputCls(!!wageModalErrors.effectiveFrom)}
+                  />
+                </div>
+              </Field>
+
+              <Field label="หมายเหตุ" hint="ไม่บังคับ">
+                <input
+                  type="text"
+                  value={wageForm.note}
+                  onChange={(e) => setWageForm((p) => ({ ...p, note: e.target.value }))}
+                  placeholder="เช่น ย้ายหน้างาน, ปรับตามผลงาน"
+                  className={inputCls(false)}
+                />
+              </Field>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowWageModal(false)}
+                  disabled={savingWage}
+                  className="flex-1 rounded-2xl border border-zinc-200 py-3 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveWage}
+                  disabled={savingWage}
+                  className="flex-1 rounded-2xl bg-brandRed py-3 text-sm font-bold text-white shadow-md shadow-brandRed/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingWage ? 'กำลังบันทึก...' : 'บันทึกค่าแรง'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -366,7 +536,9 @@ export function EditEmployeePage() {
                 <p className="text-sm font-semibold text-zinc-800">
                   {form.firstName} {form.lastName}
                 </p>
-                <p className="mt-0.5 text-xs text-zinc-500">ค่าแรง: {wage.toLocaleString('th-TH')} บาท / วัน</p>
+                {employee && (
+                  <p className="mt-0.5 text-xs text-zinc-500">ค่าแรง: {employee.wage.toLocaleString('th-TH')} บาท / วัน</p>
+                )}
               </div>
 
               <div className="mt-5 flex gap-3">

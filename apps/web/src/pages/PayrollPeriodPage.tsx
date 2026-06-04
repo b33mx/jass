@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { closePeriod, getAllPeriods, type Period } from '../api/period.api';
+import { createReportLink, type ReportKind } from '../api/report.api';
 
 function shortDate(dateStr: string): string {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('th-TH', {
@@ -48,6 +49,18 @@ export function PayrollPeriodPage() {
     setViewerTitle(titleText);
     setViewerUrl(src);
     setShowViewer(true);
+  }
+
+  async function openSignedViewer(titleText: string, kind: ReportKind, hash: string) {
+    if (!period) return;
+    setShowReportPicker(false);
+    try {
+      setError(null);
+      const reportUrl = await createReportLink({ kind, period_id: period.period_id });
+      openViewer(titleText, `${reportUrl}${hash}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ไม่สามารถเปิดรายงานได้');
+    }
   }
 
   async function onClosePeriod() {
@@ -118,10 +131,7 @@ export function PayrollPeriodPage() {
             <div className="mt-3 space-y-2">
               <button
                 type="button"
-                onClick={() => {
-                  setShowReportPicker(false);
-                  openViewer('รายงานรวมงวดเงินเดือน', `/api/reports/payroll-packet?period_id=${period.period_id}#page=1&zoom=page-fit`);
-                }}
+                onClick={() => openSignedViewer('รายงานรวมงวดเงินเดือน', 'payroll-packet', '#page=1&zoom=page-fit')}
                 className="w-full rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-left"
               >
                 <p className="text-sm font-bold text-zinc-900">รายงานรวมทั้งชุด (แนะนำ)</p>
@@ -129,10 +139,7 @@ export function PayrollPeriodPage() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowReportPicker(false);
-                  openViewer('บัตรลงเวลารายคน', `/api/reports/timecard?period_id=${period.period_id}#page=1&zoom=90`);
-                }}
+                onClick={() => openSignedViewer('บัตรลงเวลารายคน', 'timecard', '#page=1&zoom=90')}
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3 text-left"
               >
                 <p className="text-sm font-bold text-zinc-900">เฉพาะบัตรลงเวลา</p>

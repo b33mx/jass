@@ -18,3 +18,13 @@ export async function getLineUserByLineId(
   if (error) throw new Error(error.message);
   return data as { company_id: number | null; role: string } | null;
 }
+
+export async function getLineUserIdsByCompany(companyId: number): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('line_users')
+    .select('line_user_id')
+    .eq('company_id', companyId);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => r.line_user_id as string);
+}

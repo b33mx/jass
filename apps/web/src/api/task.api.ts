@@ -1,4 +1,4 @@
-import { apiFetch } from '../lib/api.ts';
+import { apiFetch } from '../lib/api';
 
 export interface TaskImageData {
   file_name: string;
