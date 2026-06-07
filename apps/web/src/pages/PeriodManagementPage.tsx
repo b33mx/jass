@@ -215,7 +215,7 @@ export function PeriodManagementPage() {
 
       {modalMode && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/45 sm:items-center">
-          <div className="w-full max-w-md rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-2xl sm:rounded-3xl sm:px-6 sm:pb-6">
+          <div className="w-full max-w-md overflow-hidden rounded-t-3xl bg-white px-5 pb-8 pt-5 shadow-2xl sm:rounded-3xl sm:px-6 sm:pb-6">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-base font-bold text-zinc-900">
                 {modalMode === 'create' ? 'สร้างงวดใหม่' : 'แก้ไขงวด'}
@@ -279,13 +279,13 @@ function DateField({
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   error?: string;
 }) {
-  const base = 'block h-12 w-full rounded-xl border bg-zinc-50 px-4 py-3 text-sm outline-none transition';
+  const base = 'block h-12 w-full min-w-0 max-w-full appearance-none rounded-xl border bg-zinc-50 px-4 py-3 text-sm outline-none transition';
   const cls = error
     ? `${base} border-red-400 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100`
     : `${base} border-zinc-200 focus:border-brandRed focus:bg-white focus:ring-2 focus:ring-brandRed/10`;
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5 overflow-hidden">
       <label className="text-sm font-medium text-zinc-700">
         {label} <span className="text-brandRed">*</span>
       </label>

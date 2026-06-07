@@ -21,6 +21,33 @@ export async function selectActivePeriod(today: string, companyId?: number): Pro
   return (data as Period | null) ?? null;
 }
 
+export async function selectActivePeriods(companyId: number): Promise<Period[]> {
+  const { data, error } = await supabase
+    .from('periods')
+    .select(PERIOD_FIELDS)
+    .eq('company_id', companyId)
+    .eq('is_active', true)
+    .is('deleted_at', null)
+    .order('start_date', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Period[];
+}
+
+export async function selectPeriodByDate(date: string, companyId: number): Promise<Period | null> {
+  const { data, error } = await supabase
+    .from('periods')
+    .select(PERIOD_FIELDS)
+    .eq('company_id', companyId)
+    .is('deleted_at', null)
+    .lte('start_date', date)
+    .gte('end_date', date)
+    .order('start_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as Period | null) ?? null;
+}
+
 export async function selectOverlappingPeriod(
   start: string,
   end: string,

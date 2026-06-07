@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { selectActivePeriod } from '../periods/period.repository.js';
+import { selectPeriodByDate } from '../periods/period.repository.js';
 import { selectAttendanceByPeriodAndDate } from '../attendance/attendance.repository.js';
 import { selectAllEmployees } from '../employees/employee.repository.js';
 import { getTasksByDate } from '../tasks/task.repository.js';
@@ -135,7 +135,7 @@ function drawTable(
 }
 
 export async function generateDailyReport(date: string, companyId: number): Promise<Buffer> {
-  const period = await selectActivePeriod(date, companyId);
+  const period = await selectPeriodByDate(date, companyId);
   const [attendance, employees, tasks] = await Promise.all([
     period ? selectAttendanceByPeriodAndDate(period.period_id, date) : Promise.resolve([]),
     selectAllEmployees(companyId),

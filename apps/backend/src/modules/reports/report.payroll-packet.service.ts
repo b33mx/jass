@@ -228,79 +228,143 @@ export async function generatePayrollPacketReport(periodId: number, companyId: n
       drawHeader(doc, `บัตรลงเวลา: ${emp.first_name} ${emp.last_name}`, periodLabel);
       let ty = 94;
 
+      const empWageHistory = wageHistoryMap.get(emp.employee_id) ?? [];
+      const startRate = empWageHistory.length > 0
+        ? getEffectiveRate(wageHistoryMap, emp.employee_id, period.start_date)
+        : { wage: emp.wage, ot_rate: emp.ot_rate };
+      const rateChangedInPeriod = empWageHistory.some(
+        h => h.effective_from > period.start_date && h.effective_from <= period.end_date,
+      );
+      const rateHeaderText = rateChangedInPeriod
+        ? `ค่าแรง ${thb(startRate.wage)} บาท/วัน | OT ${thb(startRate.ot_rate)} บาท/ชม.  (*มีการปรับค่าแรงในงวดนี้)`
+        : `ค่าแรง ${thb(startRate.wage)} บาท/วัน | OT ${thb(startRate.ot_rate)} บาท/ชม.`;
+
       doc.fillColor(C.soft).rect(M, ty, CW, 30).fill();
       doc.strokeColor(C.border).lineWidth(0.5).rect(M, ty, CW, 30).stroke();
-      doc.font('Bold').fontSize(13).fillColor(C.text)
-        .text(`ค่าแรง ${thb(emp.wage)} บาท/วัน | OT ${thb(emp.ot_rate)} บาท/ชม.`, M + 8, ty + 9);
+      doc.font('Bold').fontSize(13).fillColor(C.text).text(rateHeaderText, M + 8, ty + 9);
       ty += 36;
 
-      const tcols = { date: 114, am: 64, pm: 64, ot: 72, labor: CW - 114 - 64 - 64 - 72 };
+      const tcols = {
+        date: 108, am: 52, pm: 52,
+        laborCount: 46, laborAmt: 116,
+        otCount: 44, otAmt: CW - 108 - 52 - 52 - 46 - 116 - 44,
+      };
+      const hdrH = 44;
       const trh = 32;
-      doc.fillColor(C.soft).rect(M, ty, CW, trh).fill();
-      doc.strokeColor(C.border).lineWidth(0.5).rect(M, ty, CW, trh).stroke();
-      let tx = M;
-      doc.font('Bold').fontSize(13.5).fillColor(C.text);
-      doc.text('วันที่', tx + 4, ty + 12, { width: tcols.date - 8, lineBreak: false });
-      tx += tcols.date;
-      doc.text('เช้า', tx, ty + 12, { width: tcols.am, align: 'center', lineBreak: false });
-      tx += tcols.am;
-      doc.text('บ่าย', tx, ty + 12, { width: tcols.pm, align: 'center', lineBreak: false });
-      tx += tcols.pm;
-      doc.text('OT', tx, ty + 12, { width: tcols.ot, align: 'center', lineBreak: false });
-      tx += tcols.ot;
-      doc.text('แรง', tx, ty + 12, { width: tcols.labor, align: 'center', lineBreak: false });
-      ty += trh;
+      // group boundaries (main separators)
+      const xCheckEnd = M + tcols.date + tcols.am + tcols.pm;           // 246: check | labor
+      const xOtStart  = xCheckEnd + tcols.laborCount + tcols.laborAmt;  // 408: labor | OT
+      // sub-column separators (inside each group)
+      const xLaborSub = xCheckEnd + tcols.laborCount;  // 292: แรง | บาท
+      const xOtSub    = xOtStart + tcols.otCount;      // 452: OT | OT-บาท
+
+      const drawTcHeader = (ytop: number) => {
+        doc.fillColor(C.soft).rect(M, ytop, CW, hdrH).fill();
+        doc.strokeColor(C.border).lineWidth(0.5).rect(M, ytop, CW, hdrH).stroke();
+        // horizontal divider between top and bottom tier
+        doc.strokeColor(C.border).lineWidth(0.35)
+          .moveTo(M, ytop + 22).lineTo(M + CW, ytop + 22).stroke();
+        // main group separators — full height
+        doc.strokeColor(C.border).lineWidth(0.5)
+          .moveTo(xCheckEnd, ytop).lineTo(xCheckEnd, ytop + hdrH).stroke()
+          .moveTo(xOtStart, ytop).lineTo(xOtStart, ytop + hdrH).stroke();
+        // sub-column separators — bottom tier only
+        doc.strokeColor('#D1D5DB').lineWidth(0.4)
+          .moveTo(xLaborSub, ytop + 22).lineTo(xLaborSub, ytop + hdrH).stroke()
+          .moveTo(xOtSub, ytop + 22).lineTo(xOtSub, ytop + hdrH).stroke();
+
+        // top tier labels
+        doc.font('Bold').fontSize(11.5).fillColor(C.text);
+        const checkW = tcols.date + tcols.am + tcols.pm;
+        const laborW = tcols.laborCount + tcols.laborAmt;
+        const otW    = tcols.otCount + tcols.otAmt;
+        const topLabels: [string, number, number][] = [
+          ['วันที่',    M,           checkW],
+          ['แรง/บาท',  xCheckEnd,   laborW],
+          ['OT/บาท',   xOtStart,    otW],
+        ];
+        for (const [label, lx, lw] of topLabels) {
+          const tw = doc.widthOfString(label);
+          doc.text(label, lx + (lw - tw) / 2, ytop + 6, { lineBreak: false });
+        }
+
+        // bottom tier sub-labels
+        doc.font('Regular').fontSize(10).fillColor(C.muted);
+        const subLabels: [string, number, number][] = [
+          ['แรง', xCheckEnd,  tcols.laborCount],
+          ['บาท', xLaborSub,  tcols.laborAmt],
+          ['OT',  xOtStart,   tcols.otCount],
+          ['บาท', xOtSub,     tcols.otAmt],
+        ];
+        for (const [label, lx, lw] of subLabels) {
+          const tw = doc.widthOfString(label);
+          doc.text(label, lx + (lw - tw) / 2, ytop + 28, { lineBreak: false });
+        }
+      };
+      drawTcHeader(ty);
+      ty += hdrH;
+
+      let sumDays = 0, sumOt = 0, wagePay = 0, otPay = 0;
 
       dates.forEach((d, idx) => {
         if (ty + trh > PAGE_H - M) {
           doc.addPage();
           drawHeader(doc, `บัตรลงเวลา: ${emp.first_name} ${emp.last_name}`, periodLabel);
           ty = 94;
-          doc.fillColor(C.soft).rect(M, ty, CW, trh).fill();
-          doc.strokeColor(C.border).lineWidth(0.5).rect(M, ty, CW, trh).stroke();
-          let thx = M;
-          doc.font('Bold').fontSize(13.5).fillColor(C.text);
-          doc.text('วันที่', thx + 4, ty + 12, { width: tcols.date - 8, lineBreak: false });
-          thx += tcols.date;
-          doc.text('เช้า', thx, ty + 12, { width: tcols.am, align: 'center', lineBreak: false });
-          thx += tcols.am;
-          doc.text('บ่าย', thx, ty + 12, { width: tcols.pm, align: 'center', lineBreak: false });
-          thx += tcols.pm;
-          doc.text('OT', thx, ty + 12, { width: tcols.ot, align: 'center', lineBreak: false });
-          thx += tcols.ot;
-          doc.text('แรง', thx, ty + 12, { width: tcols.labor, align: 'center', lineBreak: false });
-          ty += trh;
+          drawTcHeader(ty);
+          ty += hdrH;
         }
         const att = attLookup.get(emp.employee_id)?.get(d);
+        const rawRate = getEffectiveRate(wageHistoryMap, emp.employee_id, d);
+        const dayRate = rawRate.wage > 0 ? rawRate : { wage: emp.wage, ot_rate: emp.ot_rate };
+        const labor = (att?.morning_check ? 0.5 : 0) + (att?.afternoon_check ? 0.5 : 0);
+        const otVal = att?.ot ?? 0;
+        const dayWage = labor * dayRate.wage;
+        const dayOt = otVal * dayRate.ot_rate;
+
+        sumDays += labor;
+        sumOt += otVal;
+        wagePay += dayWage;
+        otPay += dayOt;
+
         if (idx % 2 === 1) doc.fillColor(C.stripe).rect(M, ty, CW, trh).fill();
         doc.strokeColor(C.border).lineWidth(0.35).rect(M, ty, CW, trh).stroke();
+        doc.strokeColor(C.border).lineWidth(0.4)
+          .moveTo(xCheckEnd, ty).lineTo(xCheckEnd, ty + trh).stroke()
+          .moveTo(xOtStart, ty).lineTo(xOtStart, ty + trh).stroke();
+        doc.strokeColor('#E5E7EB').lineWidth(0.4)
+          .moveTo(xLaborSub, ty + 3).lineTo(xLaborSub, ty + trh - 3).stroke()
+          .moveTo(xOtSub, ty + 3).lineTo(xOtSub, ty + trh - 3).stroke();
+
         let cx = M;
-        doc.font('Bold').fontSize(12.5).fillColor(C.text).text(formatThaiDate(d), cx + 4, ty + 10, { width: tcols.date - 8, lineBreak: false });
+        doc.font('Bold').fontSize(12).fillColor(C.text)
+          .text(formatThaiDate(d), cx + 4, ty + 11, { width: tcols.date - 8, lineBreak: false });
         cx += tcols.date;
         if (att) drawPresenceMark(doc, cx + tcols.am / 2, ty + trh / 2, Boolean(att.morning_check));
         cx += tcols.am;
         if (att) drawPresenceMark(doc, cx + tcols.pm / 2, ty + trh / 2, Boolean(att.afternoon_check));
         cx += tcols.pm;
-        const otVal = att?.ot ?? 0;
-        doc.font('Bold').fontSize(12.5).fillColor(otVal > 0 ? C.section : C.muted).text(otVal > 0 ? String(otVal) : '-', cx, ty + 10, { width: tcols.ot, align: 'center', lineBreak: false });
-        cx += tcols.ot;
-        const labor = (att?.morning_check ? 0.5 : 0) + (att?.afternoon_check ? 0.5 : 0);
-        doc.font('Bold').fontSize(12.5).fillColor(C.text).text(labor > 0 ? String(labor) : '-', cx, ty + 10, { width: tcols.labor, align: 'center', lineBreak: false });
+        doc.font('Bold').fontSize(12).fillColor(labor > 0 ? C.text : C.muted);
+        const laborStr = labor > 0 ? String(labor) : '-';
+        doc.text(laborStr, cx + (tcols.laborCount - doc.widthOfString(laborStr)) / 2, ty + 11, { lineBreak: false });
+        cx += tcols.laborCount;
+
+        doc.font('Regular').fontSize(11).fillColor(labor > 0 ? C.text : C.muted);
+        const wageStr = labor > 0 ? thb(dayWage) : '-';
+        doc.text(wageStr, cx + (tcols.laborAmt - doc.widthOfString(wageStr)) / 2, ty + 11, { lineBreak: false });
+        cx += tcols.laborAmt;
+
+        doc.font('Bold').fontSize(12).fillColor(otVal > 0 ? C.section : C.muted);
+        const otStr = otVal > 0 ? String(otVal) : '-';
+        doc.text(otStr, cx + (tcols.otCount - doc.widthOfString(otStr)) / 2, ty + 11, { lineBreak: false });
+        cx += tcols.otCount;
+
+        doc.font('Regular').fontSize(11).fillColor(otVal > 0 ? C.section : C.muted);
+        const otAmtStr = otVal > 0 ? thb(dayOt) : '-';
+        doc.text(otAmtStr, cx + (tcols.otAmt - doc.widthOfString(otAmtStr)) / 2, ty + 11, { lineBreak: false });
         ty += trh;
       });
 
-      const records = Array.from((attLookup.get(emp.employee_id) ?? new Map()).values());
-      const sumDays = records.reduce((sum, r) => sum + (r.morning_check ? 0.5 : 0) + (r.afternoon_check ? 0.5 : 0), 0);
-      const sumOt = records.reduce((sum, r) => sum + (r.ot ?? 0), 0);
-      const wagePay = records.reduce((sum, r) => {
-        const rate = getEffectiveRate(wageHistoryMap, emp.employee_id, r.attendance_date);
-        const labor = (r.morning_check ? 0.5 : 0) + (r.afternoon_check ? 0.5 : 0);
-        return sum + labor * rate.wage;
-      }, 0);
-      const otPay = records.reduce((sum, r) => {
-        const rate = getEffectiveRate(wageHistoryMap, emp.employee_id, r.attendance_date);
-        return sum + (r.ot ?? 0) * rate.ot_rate;
-      }, 0);
       const sumPay = wagePay + otPay;
 
       if (ty + 46 > PAGE_H - M) {

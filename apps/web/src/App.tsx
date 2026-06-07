@@ -13,6 +13,7 @@ import { PayrollPage } from './pages/PayrollPage';
 import { PayrollPeriodPage } from './pages/PayrollPeriodPage';
 import { PeriodManagementPage } from './pages/PeriodManagementPage';
 import { WorkReportPage } from './pages/WorkReportPage';
+import { SelectPeriodPage } from './pages/SelectPeriodPage';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/attendance" element={<AttendanceOverviewPage />} />
         <Route path="/attendance/log" element={<AttendancePage />} />
         <Route path="/reports/work" element={<WorkReportPage />} />
+        <Route path="/reports/select-period" element={<SelectPeriodPage />} />
         <Route path="/payroll" element={<PayrollPage />} />
         <Route path="/payroll/period/:id" element={<PayrollPeriodPage />} />
         <Route path="/periods" element={<PeriodManagementPage />} />

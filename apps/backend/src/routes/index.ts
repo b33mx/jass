@@ -7,15 +7,17 @@ import { reportRouter } from '../modules/reports/report.route.js';
 import { healthRouter } from './health.route.js';
 import { lineWebhookRouter } from './line-webhook.route.js';
 import { lineAuthMiddleware } from '../middleware/line-auth.js';
-import { handleReportAccess } from '../modules/reports/report.controller.js';
+import { handleReportAccess, handleGetActivePeriods, handleWorkPeriodReport } from '../modules/reports/report.controller.js';
 
 export function registerRoutes(app: Express) {
   app.use('/health', healthRouter);
   app.use('/webhook/line', lineWebhookRouter);
   app.use('/webhook', lineWebhookRouter);
 
-  // report access ต้องอยู่ก่อน lineAuthMiddleware เพราะ link เปิดใน browser ไม่มี LINE auth header
+  // report routes ต้องอยู่ก่อน lineAuthMiddleware เพราะ link เปิดใน browser ไม่มี LINE auth header
   app.get('/api/reports/access', handleReportAccess);
+  app.get('/api/reports/active-periods', handleGetActivePeriods);
+  app.get('/api/reports/work-period', handleWorkPeriodReport);
 
   app.use('/api', lineAuthMiddleware);
   app.use('/api/employees', employeeRouter);

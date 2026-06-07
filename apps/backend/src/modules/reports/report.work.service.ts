@@ -1,7 +1,8 @@
 import PDFDocument from 'pdfkit';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { selectActivePeriod } from '../periods/period.repository.js';
+import { selectPeriodByDate, selectPeriodById } from '../periods/period.repository.js';
+import type { Period } from '../periods/period.types.js';
 import { selectAttendanceByPeriodId } from '../attendance/attendance.repository.js';
 import { selectAllEmployees } from '../employees/employee.repository.js';
 import { getTasksByDateRange } from '../tasks/task.repository.js';
@@ -62,10 +63,7 @@ function pageBreak(doc: PDFKit.PDFDocument, y: number, needed: number): number {
   return y;
 }
 
-export async function generateWorkReport(date: string, companyId: number): Promise<Buffer> {
-  const period = await selectActivePeriod(date, companyId);
-  if (!period) throw new Error('ไม่พบงวดที่เปิดอยู่สำหรับวันที่นี้');
-
+async function fetchAndRenderWorkReport(period: Period, companyId: number): Promise<Buffer> {
   const [allAtt, employees, tasks] = await Promise.all([
     selectAttendanceByPeriodId(period.period_id),
     selectAllEmployees(companyId),
@@ -296,4 +294,16 @@ export async function generateWorkReport(date: string, companyId: number): Promi
 
     doc.end();
   });
+}
+
+export async function generateWorkReport(date: string, companyId: number): Promise<Buffer> {
+  const period = await selectPeriodByDate(date, companyId);
+  if (!period) throw new Error('ไม่พบงวดสำหรับวันที่นี้');
+  return fetchAndRenderWorkReport(period, companyId);
+}
+
+export async function generateWorkReportByPeriodId(periodId: number, companyId: number): Promise<Buffer> {
+  const period = await selectPeriodById(periodId, companyId);
+  if (!period) throw new Error('ไม่พบงวดนี้');
+  return fetchAndRenderWorkReport(period, companyId);
 }
