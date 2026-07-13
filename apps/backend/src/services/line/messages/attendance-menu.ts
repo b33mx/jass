@@ -1,8 +1,11 @@
 import type { LineMessage } from '../types.js';
+import { appendQueryParam, joinUrlPath } from '../../../lib/url.js';
 
-export function createAttendanceFlexMessage(liffId: string, currentWorkReportUrl: string): LineMessage {
-  const liffBase = `https://liff.line.me/${liffId}`;
+function appUrl(appBaseUrl: string, path: string, lineUserId?: string): string {
+  return appendQueryParam(joinUrlPath(appBaseUrl, path), 'lineUserId', lineUserId);
+}
 
+export function createAttendanceFlexMessage(appBaseUrl: string, currentWorkReportUrl: string, lineUserId?: string): LineMessage {
   return {
     type: 'flex',
     altText: 'เมนูลงเวลางาน',
@@ -32,7 +35,7 @@ export function createAttendanceFlexMessage(liffId: string, currentWorkReportUrl
             action: {
               type: 'uri',
               label: 'ลงเวลางาน',
-              uri: `${liffBase}/attendance`,
+              uri: appUrl(appBaseUrl, '/attendance', lineUserId),
             },
           },
           {

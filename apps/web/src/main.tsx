@@ -1,10 +1,9 @@
-import liff from '@line/liff';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './styles/index.css';
-import { setLineUserId } from './lib/api';
+import { captureLineRecipientFromUrl } from './lib/api';
 
 function applyLiffStatePath(): void {
   // LIFF may not update window.location before init resolves.
@@ -31,45 +30,9 @@ function renderApp(): void {
   );
 }
 
-async function bootstrap() {
-  const liffId = import.meta.env.VITE_LIFF_ID;
-
-  if (!liffId) {
-    console.error('[LIFF] VITE_LIFF_ID is not configured');
-    applyLiffStatePath();
-    renderApp();
-    return;
-  }
-
-  try {
-    await liff.init({ liffId });
-  } catch (err) {
-    console.error('[LIFF] init error:', err);
-    applyLiffStatePath();
-    renderApp();
-    return;
-  }
-
-  // Outside LINE app and not logged in → redirect to LINE login
-  if (!liff.isLoggedIn() && !liff.isInClient()) {
-    liff.login();
-    return;
-  }
-
-  try {
-    // getDecodedIDToken is synchronous (cached) — no network call needed
-    const idToken = liff.getDecodedIDToken();
-    if (idToken?.sub) {
-      setLineUserId(idToken.sub);
-    } else {
-      const profile = await liff.getProfile();
-      setLineUserId(profile.userId);
-    }
-  } catch (err) {
-    console.error('[LIFF] get user id error:', err);
-  }
-
+function bootstrap() {
   applyLiffStatePath();
+  captureLineRecipientFromUrl();
   renderApp();
 }
 

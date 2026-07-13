@@ -1,8 +1,11 @@
 import type { LineMessage } from '../types.js';
+import { appendQueryParam, joinUrlPath } from '../../../lib/url.js';
 
-export function createPeriodFlexMessage(liffId: string, activePeriodLabel?: string): LineMessage {
-  const liffBase = `https://liff.line.me/${liffId}`;
+function appUrl(appBaseUrl: string, path: string, lineUserId?: string): string {
+  return appendQueryParam(joinUrlPath(appBaseUrl, path), 'lineUserId', lineUserId);
+}
 
+export function createPeriodFlexMessage(appBaseUrl: string, activePeriodLabel?: string, lineUserId?: string): LineMessage {
   return {
     type: 'flex',
     altText: 'เมนูจัดการงวด',
@@ -44,7 +47,7 @@ export function createPeriodFlexMessage(liffId: string, activePeriodLabel?: stri
             action: {
               type: 'uri',
               label: 'สร้าง / แก้ไข / ลบงวด',
-              uri: `${liffBase}/periods`,
+              uri: appUrl(appBaseUrl, '/periods', lineUserId),
             },
           },
           {
@@ -54,7 +57,7 @@ export function createPeriodFlexMessage(liffId: string, activePeriodLabel?: stri
             action: {
               type: 'uri',
               label: 'คำนวณเงินเดือน',
-              uri: `${liffBase}/payroll`,
+              uri: appUrl(appBaseUrl, '/payroll', lineUserId),
             },
           },
         ],

@@ -8,7 +8,6 @@ import { env } from '../../../config/env.js';
 import { getAllEmployees } from '../../../modules/employees/employee.service.js';
 import { getActivePeriod } from '../../../modules/periods/period.service.js';
 import { handleUserFollow } from '../../../modules/line-users/line-user.service.js';
-import { getLineUserByLineId } from '../../../modules/line-users/line-user.repository.js';
 import { buildReportUrl, createReportToken } from '../../../modules/reports/report-link-token.js';
 import { getPublicBaseUrl } from '../../../lib/public-url.js';
 
@@ -42,19 +41,12 @@ export async function handleLineEvent(event: LineEvent): Promise<void> {
   if (event.message?.type !== 'text' || !event.replyToken) return;
 
   const lineUserId = event.source?.userId;
-  if (!lineUserId) return;
-
-  const lineUser = await getLineUserByLineId(lineUserId);
-  if (!lineUser?.company_id) {
-    await replyToLine(event.replyToken, [{ type: 'text', text: 'กรุณาติดต่อ admin เพื่อตั้งค่าเบื้องต้น' }]);
-    return;
-  }
-  const companyId = lineUser.company_id;
+  const companyId = env.DEFAULT_COMPANY_ID;
 
   const userText = event.message.text?.trim();
 
   if (userText === TRIGGER_MENU) {
-    await replyToLine(event.replyToken, [createEmployeeFlexMessage(env.LIFF_ID)]);
+    await replyToLine(event.replyToken, [createEmployeeFlexMessage(env.WEB_BASE_URL, lineUserId)]);
     return;
   }
 
@@ -65,13 +57,13 @@ export async function handleLineEvent(event: LineEvent): Promise<void> {
       companyId,
     });
     await replyToLine(event.replyToken, [
-      createAttendanceFlexMessage(env.LIFF_ID, buildReportUrl(getPublicBaseUrl(), token)),
+      createAttendanceFlexMessage(env.WEB_BASE_URL, buildReportUrl(getPublicBaseUrl(), token), lineUserId),
     ]);
     return;
   }
 
   if (userText === TRIGGER_PAYROLL) {
-    await replyToLine(event.replyToken, [createPayrollFlexMessage(env.LIFF_ID)]);
+    await replyToLine(event.replyToken, [createPayrollFlexMessage(env.WEB_BASE_URL, lineUserId)]);
     return;
   }
 
@@ -83,7 +75,7 @@ export async function handleLineEvent(event: LineEvent): Promise<void> {
         new Date(s + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
       activePeriodLabel = `${fmt(active.start_date)} – ${fmt(active.end_date)}`;
     }
-    await replyToLine(event.replyToken, [createPeriodFlexMessage(env.LIFF_ID, activePeriodLabel)]);
+    await replyToLine(event.replyToken, [createPeriodFlexMessage(env.WEB_BASE_URL, activePeriodLabel, lineUserId)]);
     return;
   }
 

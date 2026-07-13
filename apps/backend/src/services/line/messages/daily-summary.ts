@@ -1,11 +1,15 @@
 import { selectAllEmployees } from '../../../modules/employees/employee.repository.js';
 import { selectAttendanceByPeriodAndDate } from '../../../modules/attendance/attendance.repository.js';
 import { selectActivePeriod } from '../../../modules/periods/period.repository.js';
-import { getLineUserIdsByCompany } from '../../../modules/line-users/line-user.repository.js';
 import { buildReportUrl, createReportToken } from '../../../modules/reports/report-link-token.js';
 import type { CreateTaskDto } from '../../../modules/tasks/task.types.js';
-import { multicastToLine } from '../client.js';
+import { pushToLine } from '../client.js';
 import { env } from '../../../config/env.js';
+
+export interface DailySummaryOptions {
+  baseUrl?: string;
+  lineUserId?: string;
+}
 
 function formatThaiDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
@@ -17,7 +21,12 @@ function formatThaiDate(dateStr: string): string {
   });
 }
 
-export async function sendDailySummary(date: string, tasks: CreateTaskDto[], companyId: number, baseUrl?: string): Promise<void> {
+export async function sendDailySummary(date: string, tasks: CreateTaskDto[], companyId: number, options: DailySummaryOptions = {}): Promise<void> {
+  if (!options.lineUserId || options.lineUserId === 'public') {
+    console.warn('[daily-summary] no LINE recipient; skip LINE');
+    return;
+  }
+
   const period = await selectActivePeriod(date, companyId);
   if (!period) {
     console.warn(`[daily-summary] no active period for ${date}; skip LINE`);
@@ -65,9 +74,8 @@ export async function sendDailySummary(date: string, tasks: CreateTaskDto[], com
   ].join('\n');
 
   const token = createReportToken({ kind: 'daily', date, companyId });
-  const reportUrl = buildReportUrl(baseUrl ?? env.API_BASE_URL, token);
+  const reportUrl = buildReportUrl(options.baseUrl ?? env.API_BASE_URL, token);
   const fullText = `${text}\n\n📄 รายงานประจำวัน\n${reportUrl}`;
 
-  const userIds = await getLineUserIdsByCompany(companyId);
-  await multicastToLine(userIds, [{ type: 'text', text: fullText }]);
+  await pushToLine(options.lineUserId, [{ type: 'text', text: fullText }]);
 }

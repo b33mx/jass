@@ -17,7 +17,8 @@ export function PayrollPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<Period | null>(null);
   const [closing, setClosing] = useState(false);
-  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [prefetchedUrl, setPrefetchedUrl] = useState<string | null>(null);
 
   async function fetchPeriods() {
     const data = await getAllPeriods();
@@ -54,6 +55,14 @@ export function PayrollPage() {
       });
   }, [sortedPeriods]);
 
+  useEffect(() => {
+    if (!selectedPeriod) { setPrefetchedUrl(null); return; }
+    setPrefetchedUrl(null);
+    createReportLink({ kind: 'payroll-packet', period_id: selectedPeriod.period_id })
+      .then(setPrefetchedUrl)
+      .catch(() => {});
+  }, [selectedPeriod]);
+
   async function onClosePeriod() {
     if (!selectedPeriod || !selectedPeriod.is_active) return;
     if (!window.confirm('ยืนยันปิดงวดนี้?')) return;
@@ -75,22 +84,20 @@ export function PayrollPage() {
   }
 
   async function onCopyReportLink(period: Period) {
-    try {
-      const reportUrl = await createReportLink({ kind: 'payroll-packet', period_id: period.period_id });
-      const text = `สวัสดีค่า 😊\nรายงานเงินเดือนงวดวันที่ ${shortDate(period.start_date)} - ${shortDate(period.end_date)} พร้อมแล้วนะคะ ✨\nกดดูรายงานได้ที่ลิงก์นี้เลยค่ะ 🔗\n${reportUrl}`;
-      await navigator.clipboard.writeText(text);
-      setCopySuccess('คัดลอกลิงก์รายงานแล้ว');
-      window.setTimeout(() => setCopySuccess(null), 1800);
-    } catch (err) {
-      setCopySuccess(err instanceof Error ? err.message : 'คัดลอกไม่สำเร็จ');
-      window.setTimeout(() => setCopySuccess(null), 1800);
+    const reportUrl = prefetchedUrl ?? await createReportLink({ kind: 'payroll-packet', period_id: period.period_id }).catch(() => null);
+    if (!reportUrl) { setCopySuccess(true); window.setTimeout(() => setCopySuccess(false), 1800); return; }
+    const text = `สวัสดีค่า 😊\nรายงานเงินเดือนงวดวันที่ ${shortDate(period.start_date)} - ${shortDate(period.end_date)} พร้อมแล้วนะคะ ✨\nกดดูรายงานได้ที่ลิงก์นี้เลยค่ะ 🔗\n${reportUrl}`;
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text).catch(() => {});
     }
+    setCopySuccess(true);
+    window.setTimeout(() => setCopySuccess(false), 1800);
   }
 
   async function onOpenReport(period: Period) {
     try {
       setError(null);
-      const reportUrl = await createReportLink({ kind: 'payroll-packet', period_id: period.period_id });
+      const reportUrl = prefetchedUrl ?? await createReportLink({ kind: 'payroll-packet', period_id: period.period_id });
       window.open(reportUrl, '_blank', 'noopener,noreferrer');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ไม่สามารถเปิดรายงานได้');
@@ -158,7 +165,7 @@ export function PayrollPage() {
                 <p className="text-base font-bold text-zinc-900">งวด {shortDate(selectedPeriod.start_date)} - {shortDate(selectedPeriod.end_date)}</p>
                 <p className="text-xs text-zinc-500">เลือกการทำงานของงวดนี้</p>
               </div>
-              <button type="button" onClick={() => setSelectedPeriod(null)} className="text-xs font-semibold text-zinc-500">ปิด</button>
+              <button type="button" onClick={() => { setSelectedPeriod(null); setCopySuccess(false); }} className="text-xs font-semibold text-zinc-500">ปิด</button>
             </div>
 
             <div className="mt-3 space-y-2">
@@ -179,7 +186,14 @@ export function PayrollPage() {
                 <p className="text-sm font-bold text-brandRed">คัดลอกลิงก์รายงาน</p>
                 <p className="mt-1 text-xs text-brandRed/80">คัดลอกข้อความพร้อมลิงก์สำหรับส่งต่อ</p>
               </button>
-              {copySuccess && <p className="text-xs font-semibold text-emerald-700">{copySuccess}</p>}
+              {copySuccess && (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <svg className="h-4 w-4 shrink-0 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-xs font-semibold text-emerald-700">คัดลอกเรียบร้อย</span>
+                </div>
+              )}
 
               <button
                 type="button"

@@ -1,8 +1,11 @@
 import type { LineMessage } from '../types.js';
+import { appendQueryParam, joinUrlPath } from '../../../lib/url.js';
 
-export function createEmployeeFlexMessage(liffId: string): LineMessage {
-  const liffBase = `https://liff.line.me/${liffId}`;
+function appUrl(appBaseUrl: string, path: string, lineUserId?: string): string {
+  return appendQueryParam(joinUrlPath(appBaseUrl, path), 'lineUserId', lineUserId);
+}
 
+export function createEmployeeFlexMessage(appBaseUrl: string, lineUserId?: string): LineMessage {
   return {
     type: 'flex',
     altText: 'เมนูจัดการพนักงาน',
@@ -42,7 +45,7 @@ export function createEmployeeFlexMessage(liffId: string): LineMessage {
             action: {
               type: 'uri',
               label: 'สร้าง',
-              uri: `${liffBase}/employees/new`
+              uri: appUrl(appBaseUrl, '/employees/new', lineUserId)
             }
           },
           {
@@ -53,7 +56,7 @@ export function createEmployeeFlexMessage(liffId: string): LineMessage {
             action: {
               type: 'uri',
               label: 'แก้ไข/ลบ',
-              uri: `${liffBase}/employees/edit`
+              uri: appUrl(appBaseUrl, '/employees/edit', lineUserId)
             }
           },
           // {
