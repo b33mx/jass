@@ -4,7 +4,7 @@ import { generateWorkReport, generateWorkReportByPeriodId } from './report.work.
 import { generateTimecardReport } from './report.timecard.service.js';
 import { generatePayrollPacketReport } from './report.payroll-packet.service.js';
 import { env } from '../../config/env.js';
-import { buildReportUrl, createReportToken, createShortLink, parseReportToken, resolveShortLink, type ReportKind } from './report-link-token.js';
+import { buildReportUrl, createReportToken, parseReportToken, type ReportKind } from './report-link-token.js';
 import { getPublicBaseUrl } from '../../lib/public-url.js';
 import { selectActivePeriods } from '../periods/period.repository.js';
 
@@ -186,18 +186,7 @@ export async function handleCreateReportLink(req: Request, res: Response) {
   });
   const baseUrl = getPublicBaseUrl();
   const url = buildReportUrl(baseUrl, token);
-  const shortCode = createShortLink(baseUrl, token);
-  res.json({ token, url, shortCode });
-}
-
-export function handleShortLink(req: Request, res: Response) {
-  const code = req.params.code as string;
-  const token = resolveShortLink(code);
-  if (!token) {
-    res.status(404).send('ลิงก์นี้หมดอายุหรือไม่ถูกต้อง');
-    return;
-  }
-  res.redirect(302, `/api/reports/access?t=${encodeURIComponent(token)}`);
+  res.json({ token, url });
 }
 
 async function serveSelectPeriodPage(req: Request, res: Response, next: NextFunction, token: string) {

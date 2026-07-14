@@ -52,28 +52,3 @@ export function parseReportToken(token: string): ReportTokenPayload {
 export function buildReportUrl(baseUrl: string, token: string): string {
   return `${baseUrl}/api/reports/access?t=${encodeURIComponent(token)}`;
 }
-
-// In-memory short link store: code → token (max ~10k entries, evict oldest)
-const shortLinkStore = new Map<string, string>();
-const MAX_SHORT_LINKS = 10_000;
-
-function randomCode(len = 7): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const bytes = crypto.randomBytes(len);
-  return Array.from(bytes, (b) => chars[b % chars.length]).join('');
-}
-
-export function createShortLink(_baseUrl: string, token: string): string {
-  let code = randomCode();
-  while (shortLinkStore.has(code)) code = randomCode();
-  if (shortLinkStore.size >= MAX_SHORT_LINKS) {
-    const oldest = shortLinkStore.keys().next().value;
-    if (oldest) shortLinkStore.delete(oldest);
-  }
-  shortLinkStore.set(code, token);
-  return code;
-}
-
-export function resolveShortLink(code: string): string | undefined {
-  return shortLinkStore.get(code);
-}
